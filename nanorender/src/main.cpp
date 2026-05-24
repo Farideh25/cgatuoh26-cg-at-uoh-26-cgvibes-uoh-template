@@ -48,10 +48,10 @@ int main() {
       // Simple gradient background
       int x = i % WIDTH;
       int y = i / WIDTH;
-      uint8_t r = (uint8_t)((float)x / WIDTH * 128) + 32;
-      uint8_t g = (uint8_t)((float)y / HEIGHT * 128) + 32;
-      uint8_t b = 64;
-      g_buffer[i] = MFB_RGB(r, g, b);
+uint8_t r = (x ^ y) % 255;
+uint8_t g = (x | y) % 255;
+uint8_t b = (x & y) % 255;
+g_buffer[i] = MFB_RGB(r, g, b);
     }
 
     // 3. UI Logic
