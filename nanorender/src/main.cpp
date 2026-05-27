@@ -61,6 +61,7 @@ g_buffer[i] = MFB_RGB(r, g, b);
     static int checkbox_b = 1;
     static char textbox_buf[128] = "edit me";
     static bool quit_requested = false;
+    static int show_message = 0;
 
     mu_begin(ctx);
 
@@ -123,9 +124,20 @@ g_buffer[i] = MFB_RGB(r, g, b);
       if (mu_button(ctx, "Quit")) {
         quit_requested = true;
       }
+      mu_layout_row(ctx, 1, w1, 0);
+
+if (mu_button(ctx, "Show message")) {
+    show_message = !show_message;
+    printf("Show message button clicked!\n");
+}
+
+if (show_message) {
+    mu_label(ctx, "Hello from my widget!");
+}
 
       mu_end_window(ctx);
     }
+    
 
     // --- Panel window ---
     if (mu_begin_window(ctx, "Panel Demo", mu_rect(395, 20, 380, 200))) {
