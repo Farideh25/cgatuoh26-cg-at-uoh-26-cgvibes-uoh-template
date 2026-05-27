@@ -36,6 +36,8 @@ int main()
   UIRenderer renderer(WIDTH, HEIGHT);
 
   static int background_mode = 0;
+  static float color_shift = 0.0f;
+
 
   // Set up char input callback for textbox input
   mfb_set_char_input_callback(
@@ -66,9 +68,9 @@ int main()
 
       if (background_mode == 0)
       {
-        r = (x ^ y) % 255;
-        g = (x | y) % 255;
-        b = (x & y) % 255;
+  r = ((x ^ y) + (int)color_shift) % 255;
+g = ((x | y) + (int)(color_shift * 0.5f)) % 255;
+b = ((x & y) + (int)(color_shift * 0.25f)) % 255;
       }
       else if (background_mode == 1)
       {
@@ -93,6 +95,7 @@ int main()
     static char textbox_buf[128] = "edit me";
     static bool quit_requested = false;
     static int show_message = 0;
+    
 
     mu_begin(ctx);
 
@@ -128,6 +131,9 @@ int main()
       mu_layout_row(ctx, 1, w1, 0);
       mu_label(ctx, "mu_slider (0-100):");
       mu_slider(ctx, &slider_val, 0, 100);
+      mu_layout_row(ctx, 1, w1, 0);
+      mu_label(ctx, "Soft color shift:");
+      mu_slider(ctx, &color_shift, 0, 100);
 
       // number
       mu_layout_row(ctx, 1, w1, 0);
