@@ -122,14 +122,28 @@ void UIRenderer::render(mu_Context* ctx, uint32_t* buffer) {
 
 void UIRenderer::draw_rect(mu_Rect rect, mu_Color color) {
     uint32_t c = to_uint32(color);
+
     int x1 = std::max({rect.x, m_clip_rect.x, 0});
     int y1 = std::max({rect.y, m_clip_rect.y, 0});
     int x2 = std::min({rect.x + rect.w, m_clip_rect.x + m_clip_rect.w, m_width});
     int y2 = std::min({rect.y + rect.h, m_clip_rect.y + m_clip_rect.h, m_height});
 
+    bool looks_like_button = (y2 - y1) < 30 && (x2 - x1) > 40;
+
     for (int y = y1; y < y2; y++) {
         for (int x = x1; x < x2; x++) {
-            m_buffer[y * m_width + x] = c;
+
+            int shifted_x = x;
+            int shifted_y = y;
+
+            if (looks_like_button) {
+                shifted_x = x + 10;
+            }
+
+            if (shifted_x >= 0 && shifted_x < m_width &&
+                shifted_y >= 0 && shifted_y < m_height) {
+                m_buffer[shifted_y * m_width + shifted_x] = c;
+            }
         }
     }
 }
