@@ -3,7 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-extern "C" {
+extern "C"
+{
 #include "microui.h"
 }
 #include "ui_bridge.h"
@@ -14,7 +15,8 @@ extern "C" {
 
 static uint32_t g_buffer[WIDTH * HEIGHT];
 
-int main() {
+int main()
+{
   struct mfb_window *window =
       mfb_open_ex("MiniGUI Platform", WIDTH, HEIGHT, MFB_WF_RESIZABLE);
   if (!window)
@@ -24,34 +26,63 @@ int main() {
   mu_init(ctx);
 
   // Set font callbacks for microui
-  ctx->text_width = [](mu_Font font, const char *str, int len) {
+  ctx->text_width = [](mu_Font font, const char *str, int len)
+  {
     return (len < 0 ? (int)strlen(str) : len) * 8;
   };
-  ctx->text_height = [](mu_Font font) { return 8; };
+  ctx->text_height = [](mu_Font font)
+  { return 8; };
 
   UIRenderer renderer(WIDTH, HEIGHT);
 
+  static int background_mode = 0;
+
   // Set up char input callback for textbox input
   mfb_set_char_input_callback(
-      [](struct mfb_window *w, unsigned int c) {
+      [](struct mfb_window *w, unsigned int c)
+      {
+        if (c == 'c' || c == 'C')
+        {
+          background_mode = (background_mode + 1) % 3;
+          return;
+        }
         extern void ui_bridge_char_input(struct mfb_window *, unsigned int);
         ui_bridge_char_input(w, c);
       },
       window);
 
-  while (mfb_update_events(window) != MFB_STATE_EXIT) {
+  while (mfb_update_events(window) != MFB_STATE_EXIT)
+  {
     // 1. Input
     ui_bridge_input(ctx, window);
 
     // 2. Scene Rendering (Background)
-    for (int i = 0; i < WIDTH * HEIGHT; i++) {
+    for (int i = 0; i < WIDTH * HEIGHT; i++)
+    {
       // Simple gradient background
       int x = i % WIDTH;
       int y = i / WIDTH;
-uint8_t r = (x ^ y) % 255;
-uint8_t g = (x | y) % 255;
-uint8_t b = (x & y) % 255;
-g_buffer[i] = MFB_RGB(r, g, b);
+      uint8_t r, g, b;
+
+      if (background_mode == 0)
+      {
+        r = (x ^ y) % 255;
+        g = (x | y) % 255;
+        b = (x & y) % 255;
+      }
+      else if (background_mode == 1)
+      {
+        r = (x + y) % 255;
+        g = (x * 2) % 255;
+        b = (y * 2) % 255;
+      }
+      else
+      {
+        r = (y * 255) / HEIGHT;
+        g = 100;
+        b = (x * 255) / WIDTH;
+      }
+      g_buffer[i] = MFB_RGB(r, g, b);
     }
 
     // 3. UI Logic
@@ -66,7 +97,8 @@ g_buffer[i] = MFB_RGB(r, g, b);
     mu_begin(ctx);
 
     // --- Widgets window ---
-    if (mu_begin_window(ctx, "Widgets", mu_rect(20, 20, 360, 540))) {
+    if (mu_begin_window(ctx, "Widgets", mu_rect(20, 20, 360, 540)))
+    {
       int w1[] = {-1};
 
       // label / text
@@ -77,7 +109,8 @@ g_buffer[i] = MFB_RGB(r, g, b);
 
       // button
       mu_layout_row(ctx, 1, w1, 0);
-      if (mu_button(ctx, "mu_button: click me")) {
+      if (mu_button(ctx, "mu_button: click me"))
+      {
         quit_requested = false; // just a reaction
       }
 
@@ -102,16 +135,19 @@ g_buffer[i] = MFB_RGB(r, g, b);
       mu_number(ctx, &number_val, 0.1f);
 
       // header (collapsible section)
-      if (mu_header(ctx, "mu_header: collapsible section")) {
+      if (mu_header(ctx, "mu_header: collapsible section"))
+      {
         mu_layout_row(ctx, 1, w1, 0);
         mu_label(ctx, "Content inside the header.");
       }
 
       // treenode
-      if (mu_begin_treenode(ctx, "mu_treenode: root")) {
+      if (mu_begin_treenode(ctx, "mu_treenode: root"))
+      {
         mu_layout_row(ctx, 1, w1, 0);
         mu_label(ctx, "child item A");
-        if (mu_begin_treenode(ctx, "nested node")) {
+        if (mu_begin_treenode(ctx, "nested node"))
+        {
           mu_layout_row(ctx, 1, w1, 0);
           mu_label(ctx, "deeply nested item");
           mu_end_treenode(ctx);
@@ -121,31 +157,35 @@ g_buffer[i] = MFB_RGB(r, g, b);
 
       // quit button
       mu_layout_row(ctx, 1, w1, 0);
-      if (mu_button(ctx, "Quit")) {
+      if (mu_button(ctx, "Quit"))
+      {
         quit_requested = true;
       }
       mu_layout_row(ctx, 1, w1, 0);
 
-if (mu_button(ctx, "Show message")) {
-    show_message = !show_message;
-    printf("Show message button clicked!\n");
-}
+      if (mu_button(ctx, "Show message"))
+      {
+        show_message = !show_message;
+        printf("Show message button clicked!\n");
+      }
 
-if (show_message) {
-    mu_label(ctx, "Hello from my widget!");
-}
+      if (show_message)
+      {
+        mu_label(ctx, "Hello from my widget!");
+      }
 
       mu_end_window(ctx);
     }
-    
 
     // --- Panel window ---
-    if (mu_begin_window(ctx, "Panel Demo", mu_rect(395, 20, 380, 200))) {
+    if (mu_begin_window(ctx, "Panel Demo", mu_rect(395, 20, 380, 200)))
+    {
       int w2[] = {-1};
       mu_layout_row(ctx, 1, w2, 120);
       mu_begin_panel(ctx, "scrollable panel");
       int wp[] = {-1};
-      for (int i = 1; i <= 12; i++) {
+      for (int i = 1; i <= 12; i++)
+      {
         mu_layout_row(ctx, 1, wp, 0);
         char line[32];
         snprintf(line, sizeof(line), "Panel row %d", i);
@@ -156,10 +196,12 @@ if (show_message) {
     }
 
     // --- Popup demo window ---
-    if (mu_begin_window(ctx, "Popup Demo", mu_rect(395, 235, 380, 80))) {
+    if (mu_begin_window(ctx, "Popup Demo", mu_rect(395, 235, 380, 80)))
+    {
       int w3[] = {-1};
       mu_layout_row(ctx, 1, w3, 0);
-      if (mu_button(ctx, "Open popup")) {
+      if (mu_button(ctx, "Open popup"))
+      {
         mu_Container *popup = mu_get_container(ctx, "my popup");
         popup->rect = mu_rect(ctx->mouse_pos.x, ctx->mouse_pos.y, 260, 84);
         popup->open = 1;
@@ -169,11 +211,13 @@ if (show_message) {
       int popup_opt = MU_OPT_POPUP | MU_OPT_NORESIZE | MU_OPT_NOSCROLL |
                       MU_OPT_NOTITLE | MU_OPT_CLOSED;
       if (mu_begin_window_ex(ctx, "my popup", mu_rect(0, 0, 260, 84),
-                             popup_opt)) {
+                             popup_opt))
+      {
         int wp[] = {-1};
         mu_layout_row(ctx, 1, wp, 0);
         mu_label(ctx, "mu_popup: click outside to close");
-        if (mu_button(ctx, "Close")) {
+        if (mu_button(ctx, "Close"))
+        {
           mu_get_current_container(ctx)->open = 0;
         }
         mu_end_window(ctx);
@@ -183,7 +227,8 @@ if (show_message) {
 
     mu_end(ctx);
 
-    if (quit_requested) {
+    if (quit_requested)
+    {
       mfb_close(window);
       break;
     }
