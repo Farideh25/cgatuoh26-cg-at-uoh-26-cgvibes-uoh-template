@@ -14,7 +14,57 @@ extern "C"
 #define HEIGHT 1200
 
 static uint32_t g_buffer[WIDTH * HEIGHT];
+void put_pixel(int x, int y, uint32_t color)
+{
+  if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT)
+  {
+    return;
+  }
 
+  g_buffer[y * WIDTH + x] = color;
+}
+void draw_line(int x0, int y0, int x1, int y1, uint32_t color)
+{
+  int dx = abs(x1 - x0);
+  int dy = abs(y1 - y0);
+
+  int sx = (x0 < x1) ? 1 : -1;
+  int sy = (y0 < y1) ? 1 : -1;
+
+  int err = dx - dy;
+
+  while (true)
+  {
+    put_pixel(x0, y0, color);
+
+    if (x0 == x1 && y0 == y1)
+    {
+      break;
+    }
+
+    int e2 = 2 * err;
+
+    if (e2 > -dy)
+    {
+      err -= dy;
+      x0 += sx;
+    }
+
+    if (e2 < dx)
+    {
+      err += dx;
+      y0 += sy;
+    }
+  }
+}
+struct Line
+{
+  int x0;
+  int y0;
+  int x1;
+  int y1;
+  uint32_t color;
+};
 int main()
 {
   struct mfb_window *window =
@@ -37,7 +87,17 @@ int main()
 
   static int background_mode = 0;
   static float color_shift = 0.0f;
-
+  static Line lines[1000];
+  static int line_count = 0;
+  static bool is_drawing = false;
+  static int start_x = 0;
+  static int start_y = 0;
+  static int current_x = 0;
+  static int current_y = 0;
+  static bool was_mouse_down = false;
+  static float line_r = 255.0f;
+static float line_g = 255.0f;
+static float line_b = 255.0f;
 
   // Set up char input callback for textbox input
   mfb_set_char_input_callback(
@@ -57,7 +117,37 @@ int main()
   {
     // 1. Input
     ui_bridge_input(ctx, window);
+  int mouse_x = ctx->mouse_pos.x;
+int mouse_y = ctx->mouse_pos.y;
 
+bool mouse_down = ctx->mouse_down & MU_MOUSE_LEFT;
+bool mouse_pressed = mouse_down && !was_mouse_down;
+bool mouse_released = !mouse_down && was_mouse_down;
+if (mouse_pressed)
+{
+    is_drawing = true;
+
+    start_x = mouse_x;
+    start_y = mouse_y;
+
+    current_x = mouse_x;
+    current_y = mouse_y;
+}
+if (is_drawing && mouse_down)
+{
+  current_x = mouse_x;
+  current_y = mouse_y;
+}
+if (is_drawing && mouse_released)
+{
+  if (line_count < 1000)
+  {
+lines[line_count] = {start_x, start_y, mouse_x, mouse_y, MFB_RGB((int)line_r, (int)line_g, (int)line_b)};
+    line_count++;
+  }
+
+  is_drawing = false;
+}
     // 2. Scene Rendering (Background)
     for (int i = 0; i < WIDTH * HEIGHT; i++)
     {
@@ -86,7 +176,14 @@ b = ((x & y) + (int)(color_shift * 0.25f)) % 255;
       }
       g_buffer[i] = MFB_RGB(r, g, b);
     }
-
+for (int i = 0; i < line_count; i++)
+{
+  draw_line(lines[i].x0, lines[i].y0, lines[i].x1, lines[i].y1, lines[i].color);
+}
+if (is_drawing)
+{
+  draw_line(start_x, start_y, current_x, current_y, MFB_RGB((int)line_r, (int)line_g, (int)line_b));
+}
     // 3. UI Logic
     static float slider_val = 50.0f;
     static float number_val = 3.14f;
@@ -134,6 +231,43 @@ b = ((x & y) + (int)(color_shift * 0.25f)) % 255;
       mu_layout_row(ctx, 1, w1, 0);
       mu_label(ctx, "Soft color shift:");
       mu_slider(ctx, &color_shift, 0, 100);
+int color_buttons[] = {60, 60, 60, 60, 60};
+mu_layout_row(ctx, 5, color_buttons, 0);
+if (mu_button(ctx, "White"))
+{
+    line_r = 255;
+    line_g = 255;
+    line_b = 255;
+}
+
+if (mu_button(ctx, "Red"))
+{
+    line_r = 255;
+    line_g = 0;
+    line_b = 0;
+}
+
+if (mu_button(ctx, "Green"))
+{
+    line_r = 0;
+    line_g = 255;
+    line_b = 0;
+}
+
+if (mu_button(ctx, "Blue"))
+{
+    line_r = 0;
+    line_g = 0;
+    line_b = 255;
+}
+
+if (mu_button(ctx, "Yellow"))
+{
+    line_r = 255;
+    line_g = 255;
+    line_b = 0;
+}
+
 
       // number
       mu_layout_row(ctx, 1, w1, 0);
@@ -175,14 +309,19 @@ b = ((x & y) + (int)(color_shift * 0.25f)) % 255;
         printf("Show message button clicked!\n");
       }
 
-      if (show_message)
-      {
-        mu_label(ctx, "Hello from my widget!");
-      }
+if (show_message)
+{
+  mu_label(ctx, "Hello from my widget!");
+}
 
-      mu_end_window(ctx);
-    }
+mu_layout_row(ctx, 1, w1, 0);
+if (mu_button(ctx, "Clear Lines"))
+{
+  line_count = 0;
+}
 
+mu_end_window(ctx);
+}
     // --- Panel window ---
     if (mu_begin_window(ctx, "Panel Demo", mu_rect(395, 20, 380, 200)))
     {
@@ -246,7 +385,7 @@ b = ((x & y) + (int)(color_shift * 0.25f)) % 255;
     mfb_update_state state = mfb_update_ex(window, g_buffer, WIDTH, HEIGHT);
     if (state < 0)
       break;
-
+was_mouse_down = mouse_down;
     // Cap FPS (optional, minifb has built-in sync)
     mfb_wait_sync(window);
   }
