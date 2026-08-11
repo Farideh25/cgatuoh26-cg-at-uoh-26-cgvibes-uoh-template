@@ -1,4 +1,5 @@
 #include "MiniFB.h"
+#include <glm/glm.hpp>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -67,6 +68,14 @@ struct Line
 };
 int main()
 {
+    // Small GLM example
+  glm::vec3 a(1.0f, 2.0f, 3.0f);
+  glm::vec3 b(4.0f, 5.0f, 6.0f);
+  glm::vec3 result = a + b;
+
+  printf("GLM example: (%.1f, %.1f, %.1f)\n",
+         result.x, result.y, result.z);
+         
   struct mfb_window *window =
       mfb_open_ex("MiniGUI Platform", WIDTH, HEIGHT, MFB_WF_RESIZABLE);
   if (!window)

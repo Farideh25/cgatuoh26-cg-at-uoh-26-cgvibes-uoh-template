@@ -29,6 +29,13 @@ FetchContent_MakeAvailable(microui)
 
 add_library(microui_lib STATIC ${microui_SOURCE_DIR}/src/microui.c)
 target_include_directories(microui_lib PUBLIC ${microui_SOURCE_DIR}/src)
+# --- glm ---
+FetchContent_Declare(
+    glm
+    GIT_REPOSITORY https://github.com/g-truc/glm.git
+    GIT_TAG        0af55ccecd98d4e5a8d1fad7de25ba429d60e863
+)
+FetchContent_MakeAvailable(glm)
 
 # --- Our application ---
 add_executable(minigui
@@ -38,6 +45,6 @@ add_executable(minigui
     src/ui_bridge.h
 )
 
-target_link_libraries(minigui PRIVATE microui_lib minifb)
+target_link_libraries(minigui PRIVATE microui_lib minifb glm::glm)
 target_include_directories(minigui PRIVATE src ${microui_SOURCE_DIR}/src ${minifb_SOURCE_DIR}/include)
 target_include_directories(minigui PRIVATE src src/deps/minifb/include)
