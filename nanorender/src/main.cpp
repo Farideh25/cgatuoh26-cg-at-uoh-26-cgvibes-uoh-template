@@ -1,8 +1,12 @@
 #include "MiniFB.h"
 #include <glm/glm.hpp>
+#include <fstream>
+#include <sstream>
+#include <string>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <vector>
 
 extern "C"
 {
@@ -66,6 +70,52 @@ struct Line
   int y1;
   uint32_t color;
 };
+struct Mesh
+{
+    std::vector<glm::vec3> vertices;
+    std::vector<glm::ivec3> faces;
+};
+bool load_obj(const char *filename, Mesh &mesh)
+{
+    std::ifstream file(filename);
+
+    if (!file.is_open())
+    {
+        printf("Failed to open OBJ file: %s\n", filename);
+        return false;
+    }
+
+    std::string line;
+
+    while (std::getline(file, line))
+    {
+        std::istringstream stream(line);
+        std::string prefix;
+
+        stream >> prefix;
+
+        if (prefix == "v")
+        {
+            float x, y, z;
+
+            if (stream >> x >> y >> z)
+            {
+                mesh.vertices.emplace_back(x, y, z);
+            }
+        }
+        else if (prefix == "f")
+        {
+            int v1, v2, v3;
+
+            if (stream >> v1 >> v2 >> v3)
+            {
+                mesh.faces.emplace_back(v1 - 1, v2 - 1, v3 - 1);
+            }
+        }
+    }
+
+    return true;
+}
 int main()
 {
     // Small GLM example
@@ -75,7 +125,15 @@ int main()
 
   printf("GLM example: (%.1f, %.1f, %.1f)\n",
          result.x, result.y, result.z);
-         
+
+  Mesh mesh;
+
+  if (load_obj("test_model.obj", mesh))
+  {
+    printf("Vertices loaded: %zu\n", mesh.vertices.size());
+    printf("Faces loaded: %zu\n", mesh.faces.size());
+  }
+
   struct mfb_window *window =
       mfb_open_ex("MiniGUI Platform", WIDTH, HEIGHT, MFB_WF_RESIZABLE);
   if (!window)
@@ -210,6 +268,18 @@ if (is_drawing)
     {
       int w1[] = {-1};
 
+      char vertices_text[64];
+      char faces_text[64];
+
+      snprintf(vertices_text, sizeof(vertices_text),
+               "OBJ Vertices: %zu", mesh.vertices.size());
+      snprintf(faces_text, sizeof(faces_text),
+               "OBJ Faces: %zu", mesh.faces.size());
+
+      mu_layout_row(ctx, 1, w1, 0);
+      mu_label(ctx, "Loaded OBJ Model");
+      mu_label(ctx, vertices_text);
+      mu_label(ctx, faces_text);
       // label / text
       mu_layout_row(ctx, 1, w1, 0);
       mu_label(ctx, "mu_label: plain static text");
