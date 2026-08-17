@@ -116,6 +116,24 @@ bool load_obj(const char *filename, Mesh &mesh)
 
     return true;
 }
+bool compute_bounding_box(const Mesh &mesh, glm::vec3 &min_corner, glm::vec3 &max_corner)
+{
+    if (mesh.vertices.empty())
+    {
+        return false;
+    }
+
+    min_corner = mesh.vertices[0];
+    max_corner = mesh.vertices[0];
+
+    for (size_t i = 1; i < mesh.vertices.size(); i++)
+    {
+        min_corner = glm::min(min_corner, mesh.vertices[i]);
+        max_corner = glm::max(max_corner, mesh.vertices[i]);
+    }
+
+    return true;
+}
 int main()
 {
     // Small GLM example
@@ -132,6 +150,67 @@ int main()
   {
     printf("Vertices loaded: %zu\n", mesh.vertices.size());
     printf("Faces loaded: %zu\n", mesh.faces.size());
+    glm::vec3 min_corner;
+    glm::vec3 max_corner;
+
+    if (compute_bounding_box(mesh, min_corner, max_corner))
+    {
+        printf("Bounding box min: (%.2f, %.2f, %.2f)\n",
+               min_corner.x, min_corner.y, min_corner.z);
+
+        printf("Bounding box max: (%.2f, %.2f, %.2f)\n",
+               max_corner.x, max_corner.y, max_corner.z);
+        glm::vec3 model_size = max_corner - min_corner;
+        glm::vec3 model_center = (min_corner + max_corner) * 0.5f;
+
+        printf("Model size: (%.2f, %.2f, %.2f)\n",
+               model_size.x, model_size.y, model_size.z);
+
+        printf("Model center: (%.2f, %.2f, %.2f)\n",
+               model_center.x, model_center.y, model_center.z);
+        float usable_width = WIDTH * 0.8f;
+        float usable_height = HEIGHT * 0.8f;
+
+        float uniform_scale = 1.0f;
+
+        if (model_size.x > 0.0f && model_size.y > 0.0f)
+        {
+            float scale_x = usable_width / model_size.x;
+            float scale_y = usable_height / model_size.y;
+            uniform_scale = glm::min(scale_x, scale_y);
+        }
+        else if (model_size.x > 0.0f)
+        {
+            uniform_scale = usable_width / model_size.x;
+        }
+        else if (model_size.y > 0.0f)
+        {
+            uniform_scale = usable_height / model_size.y;
+        }
+        printf("Uniform scale: %.2f\n", uniform_scale);
+
+        glm::vec3 window_center(
+            WIDTH * 0.5f,
+            HEIGHT * 0.5f,
+            0.0f);
+
+        glm::vec3 translation =
+            window_center - model_center * uniform_scale;
+
+        printf("Translation: (%.2f, %.2f, %.2f)\n",
+               translation.x, translation.y, translation.z);
+
+        std::vector<glm::vec3> transformed_vertices;
+
+        for (const glm::vec3 &vertex : mesh.vertices)
+        {
+            glm::vec3 transformed =
+                vertex * uniform_scale + translation;
+
+            transformed_vertices.push_back(transformed);
+        }
+
+    }
   }
 
   struct mfb_window *window =
