@@ -145,8 +145,8 @@ int main()
          result.x, result.y, result.z);
 
   Mesh mesh;
-
-  if (load_obj("test_model.obj", mesh))
+  std::vector<glm::vec3> transformed_vertices;
+  if (load_obj("wireframe_model.obj", mesh))
   {
     printf("Vertices loaded: %zu\n", mesh.vertices.size());
     printf("Faces loaded: %zu\n", mesh.faces.size());
@@ -168,8 +168,8 @@ int main()
 
         printf("Model center: (%.2f, %.2f, %.2f)\n",
                model_center.x, model_center.y, model_center.z);
-        float usable_width = WIDTH * 0.8f;
-        float usable_height = HEIGHT * 0.8f;
+        float usable_width = WIDTH * 0.45f;
+        float usable_height = HEIGHT * 0.45f;
 
         float uniform_scale = 1.0f;
 
@@ -199,8 +199,6 @@ int main()
 
         printf("Translation: (%.2f, %.2f, %.2f)\n",
                translation.x, translation.y, translation.z);
-
-        std::vector<glm::vec3> transformed_vertices;
 
         for (const glm::vec3 &vertex : mesh.vertices)
         {
@@ -321,6 +319,26 @@ b = ((x & y) + (int)(color_shift * 0.25f)) % 255;
         b = (x * 255) / WIDTH;
       }
       g_buffer[i] = MFB_RGB(r, g, b);
+    }
+    for (const glm::ivec3 &face : mesh.faces)
+    {
+      const glm::vec3 &v0 = transformed_vertices[face.x];
+      const glm::vec3 &v1 = transformed_vertices[face.y];
+      const glm::vec3 &v2 = transformed_vertices[face.z];
+
+      uint32_t wireframe_color = MFB_RGB(255, 255, 255);
+
+      draw_line((int)v0.x, (int)v0.y,
+                (int)v1.x, (int)v1.y,
+                wireframe_color);
+
+      draw_line((int)v1.x, (int)v1.y,
+                (int)v2.x, (int)v2.y,
+                wireframe_color);
+
+      draw_line((int)v2.x, (int)v2.y,
+                (int)v0.x, (int)v0.y,
+                wireframe_color);
     }
 for (int i = 0; i < line_count; i++)
 {

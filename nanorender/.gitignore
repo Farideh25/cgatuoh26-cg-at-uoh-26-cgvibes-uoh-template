@@ -1,2 +1,3 @@
 build/
 !test_model.obj
+!wireframe_model.obj
