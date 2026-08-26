@@ -1,5 +1,6 @@
 #include "MiniFB.h"
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -145,6 +146,9 @@ int main()
          result.x, result.y, result.z);
 
   Mesh mesh;
+  glm::vec3 model_center(0.0f, 0.0f, 0.0f);
+  float uniform_scale = 1.0f;
+  glm::vec3 translation(0.0f, 0.0f, 0.0f);
   std::vector<glm::vec3> transformed_vertices;
   if (load_obj("wireframe_model.obj", mesh))
   {
@@ -161,7 +165,7 @@ int main()
         printf("Bounding box max: (%.2f, %.2f, %.2f)\n",
                max_corner.x, max_corner.y, max_corner.z);
         glm::vec3 model_size = max_corner - min_corner;
-        glm::vec3 model_center = (min_corner + max_corner) * 0.5f;
+        model_center = (min_corner + max_corner) * 0.5f;
 
         printf("Model size: (%.2f, %.2f, %.2f)\n",
                model_size.x, model_size.y, model_size.z);
@@ -171,7 +175,7 @@ int main()
         float usable_width = WIDTH * 0.45f;
         float usable_height = HEIGHT * 0.45f;
 
-        float uniform_scale = 1.0f;
+        uniform_scale = 1.0f;
 
         if (model_size.x > 0.0f && model_size.y > 0.0f)
         {
@@ -194,7 +198,7 @@ int main()
             HEIGHT * 0.5f,
             0.0f);
 
-        glm::vec3 translation =
+        translation =
             window_center - model_center * uniform_scale;
 
         printf("Translation: (%.2f, %.2f, %.2f)\n",
@@ -240,8 +244,15 @@ int main()
   static int current_y = 0;
   static bool was_mouse_down = false;
   static float line_r = 255.0f;
-static float line_g = 255.0f;
-static float line_b = 255.0f;
+  static float line_g = 255.0f;
+  static float line_b = 255.0f;
+  static glm::vec3 local_translation(0.0f, 0.0f, 0.0f);
+  static glm::vec3 local_rotation(0.0f, 0.0f, 0.0f);
+  static glm::vec3 local_scale(1.0f, 1.0f, 1.0f);
+
+  static glm::vec3 world_translation(0.0f, 0.0f, 0.0f);
+  static glm::vec3 world_rotation(0.0f, 0.0f, 0.0f);
+  static glm::vec3 world_scale(1.0f, 1.0f, 1.0f);
 
   // Set up char input callback for textbox input
   mfb_set_char_input_callback(
@@ -264,34 +275,34 @@ static float line_b = 255.0f;
   int mouse_x = ctx->mouse_pos.x;
 int mouse_y = ctx->mouse_pos.y;
 
-bool mouse_down = ctx->mouse_down & MU_MOUSE_LEFT;
-bool mouse_pressed = mouse_down && !was_mouse_down;
-bool mouse_released = !mouse_down && was_mouse_down;
-if (mouse_pressed)
-{
-    is_drawing = true;
+//bool mouse_down = ctx->mouse_down & MU_MOUSE_LEFT;
+//bool mouse_pressed = mouse_down && !was_mouse_down;
+//bool mouse_released = !mouse_down && was_mouse_down;
+//if (mouse_pressed)
+//{
+//    is_drawing = true;
 
-    start_x = mouse_x;
-    start_y = mouse_y;
+//    start_x = mouse_x;
+//    start_y = mouse_y;
 
-    current_x = mouse_x;
-    current_y = mouse_y;
-}
-if (is_drawing && mouse_down)
-{
-  current_x = mouse_x;
-  current_y = mouse_y;
-}
-if (is_drawing && mouse_released)
-{
-  if (line_count < 1000)
-  {
-lines[line_count] = {start_x, start_y, mouse_x, mouse_y, MFB_RGB((int)line_r, (int)line_g, (int)line_b)};
-    line_count++;
-  }
+//    current_x = mouse_x;
+//    current_y = mouse_y;
+//}
+//if (is_drawing && mouse_down)
+//{
+//  current_x = mouse_x;
+//  current_y = mouse_y;
+//}
+//if (is_drawing && mouse_released)
+//{
+//  if (line_count < 1000)
+//  {
+//lines[line_count] = {start_x, start_y, mouse_x, mouse_y, MFB_RGB((int)line_r, (int)line_g, (int)line_b)};
+ //   line_count++;
+  //}
 
-  is_drawing = false;
-}
+//  is_drawing = false;
+//}
     // 2. Scene Rendering (Background)
     for (int i = 0; i < WIDTH * HEIGHT; i++)
     {
@@ -320,12 +331,92 @@ b = ((x & y) + (int)(color_shift * 0.25f)) % 255;
       }
       g_buffer[i] = MFB_RGB(r, g, b);
     }
-    for (const glm::ivec3 &face : mesh.faces)
-    {
-      const glm::vec3 &v0 = transformed_vertices[face.x];
-      const glm::vec3 &v1 = transformed_vertices[face.y];
-      const glm::vec3 &v2 = transformed_vertices[face.z];
+    glm::mat4 local_scale_matrix =
+        glm::translate(glm::mat4(1.0f), model_center);
 
+    local_scale_matrix =
+        glm::scale(local_scale_matrix, local_scale);
+
+    local_scale_matrix =
+        glm::translate(local_scale_matrix, -model_center);
+    glm::mat4 local_rotation_x =
+    glm::rotate(glm::mat4(1.0f),
+                glm::radians(local_rotation.x),
+                glm::vec3(1.0f, 0.0f, 0.0f));
+
+    glm::mat4 local_rotation_y =
+    glm::rotate(glm::mat4(1.0f),
+                glm::radians(local_rotation.y),
+                glm::vec3(0.0f, 1.0f, 0.0f));
+
+    glm::mat4 local_rotation_z =
+    glm::rotate(glm::mat4(1.0f),
+                glm::radians(local_rotation.z),
+                glm::vec3(0.0f, 0.0f, 1.0f));
+    glm::mat4 local_rotation_matrix =
+    local_rotation_z * local_rotation_y * local_rotation_x;
+
+glm::mat4 local_rotation_about_center =
+    glm::translate(glm::mat4(1.0f), model_center) *
+    local_rotation_matrix *
+    glm::translate(glm::mat4(1.0f), -model_center);
+glm::mat4 local_translation_matrix =
+    glm::translate(glm::mat4(1.0f), local_translation);
+
+glm::mat4 local_transform_matrix =
+    local_rotation_about_center *
+    local_translation_matrix *
+    local_scale_matrix;
+
+glm::mat4 world_translation_matrix =
+    glm::translate(glm::mat4(1.0f), world_translation);
+glm::mat4 world_rotation_x =
+    glm::rotate(glm::mat4(1.0f),
+                glm::radians(world_rotation.x),
+                glm::vec3(1.0f, 0.0f, 0.0f));
+
+glm::mat4 world_rotation_y =
+    glm::rotate(glm::mat4(1.0f),
+                glm::radians(world_rotation.y),
+                glm::vec3(0.0f, 1.0f, 0.0f));
+
+glm::mat4 world_rotation_z =
+    glm::rotate(glm::mat4(1.0f),
+                glm::radians(world_rotation.z),
+                glm::vec3(0.0f, 0.0f, 1.0f));
+
+glm::mat4 world_rotation_matrix =
+    world_rotation_z *
+    world_rotation_y *
+    world_rotation_x;
+glm::mat4 world_scale_matrix =
+    glm::scale(glm::mat4(1.0f), world_scale);
+
+glm::mat4 final_transform_matrix =
+    world_translation_matrix *
+    world_rotation_matrix *
+    world_scale_matrix *
+    local_transform_matrix;
+
+for (const glm::ivec3 &face : mesh.faces)
+{
+    glm::vec4 local_v0 =
+        final_transform_matrix * glm::vec4(mesh.vertices[face.x], 1.0f);
+
+    glm::vec4 local_v1 =
+        final_transform_matrix * glm::vec4(mesh.vertices[face.y], 1.0f);
+
+    glm::vec4 local_v2 =
+        final_transform_matrix * glm::vec4(mesh.vertices[face.z], 1.0f);
+
+    glm::vec3 v0 =
+        glm::vec3(local_v0) * uniform_scale + translation;
+
+    glm::vec3 v1 =
+        glm::vec3(local_v1) * uniform_scale + translation;
+
+    glm::vec3 v2 =
+        glm::vec3(local_v2) * uniform_scale + translation;
       uint32_t wireframe_color = MFB_RGB(255, 255, 255);
 
       draw_line((int)v0.x, (int)v0.y,
@@ -377,6 +468,7 @@ if (is_drawing)
       mu_label(ctx, "Loaded OBJ Model");
       mu_label(ctx, vertices_text);
       mu_label(ctx, faces_text);
+
       // label / text
       mu_layout_row(ctx, 1, w1, 0);
       mu_label(ctx, "mu_label: plain static text");
@@ -498,6 +590,71 @@ if (mu_button(ctx, "Clear Lines"))
 
 mu_end_window(ctx);
 }
+// --- Transformations window ---
+if (mu_begin_window(ctx, "Transformations", mu_rect(800, 20, 360, 950)))
+{
+  int wt[] = {-1};
+
+  mu_layout_row(ctx, 1, wt, 0);
+  mu_label(ctx, "Local Transformations");
+
+  mu_label(ctx, "Local Translation X:");
+  mu_number(ctx, &local_translation.x, 1.0f);
+
+  mu_label(ctx, "Local Translation Y:");
+  mu_number(ctx, &local_translation.y, 1.0f);
+
+  mu_label(ctx, "Local Translation Z:");
+  mu_number(ctx, &local_translation.z, 1.0f);
+
+  mu_label(ctx, "Local Rotation X:");
+  mu_number(ctx, &local_rotation.x, 1.0f);
+
+  mu_label(ctx, "Local Rotation Y:");
+  mu_number(ctx, &local_rotation.y, 1.0f);
+
+  mu_label(ctx, "Local Rotation Z:");
+  mu_number(ctx, &local_rotation.z, 1.0f);
+
+  mu_label(ctx, "Local Scale X:");
+  mu_number(ctx, &local_scale.x, 0.1f);
+
+  mu_label(ctx, "Local Scale Y:");
+  mu_number(ctx, &local_scale.y, 0.1f);
+
+  mu_label(ctx, "Local Scale Z:");
+  mu_number(ctx, &local_scale.z, 0.1f);
+  mu_layout_row(ctx, 1, wt, 0);
+mu_label(ctx, "World Transformations");
+
+mu_label(ctx, "World Translation X:");
+mu_number(ctx, &world_translation.x, 1.0f);
+
+mu_label(ctx, "World Translation Y:");
+mu_number(ctx, &world_translation.y, 1.0f);
+
+mu_label(ctx, "World Translation Z:");
+mu_number(ctx, &world_translation.z, 1.0f);
+
+mu_label(ctx, "World Rotation X:");
+mu_number(ctx, &world_rotation.x, 1.0f);
+
+mu_label(ctx, "World Rotation Y:");
+mu_number(ctx, &world_rotation.y, 1.0f);
+
+mu_label(ctx, "World Rotation Z:");
+mu_number(ctx, &world_rotation.z, 1.0f);
+
+mu_label(ctx, "World Scale X:");
+mu_number(ctx, &world_scale.x, 0.1f);
+
+mu_label(ctx, "World Scale Y:");
+mu_number(ctx, &world_scale.y, 0.1f);
+
+mu_label(ctx, "World Scale Z:");
+mu_number(ctx, &world_scale.z, 0.1f);
+  mu_end_window(ctx);
+}
     // --- Panel window ---
     if (mu_begin_window(ctx, "Panel Demo", mu_rect(395, 20, 380, 200)))
     {
@@ -561,7 +718,7 @@ mu_end_window(ctx);
     mfb_update_state state = mfb_update_ex(window, g_buffer, WIDTH, HEIGHT);
     if (state < 0)
       break;
-was_mouse_down = mouse_down;
+//was_mouse_down = mouse_down;
     // Cap FPS (optional, minifb has built-in sync)
     mfb_wait_sync(window);
   }
