@@ -271,9 +271,24 @@ int main()
   while (mfb_update_events(window) != MFB_STATE_EXIT)
   {
     // 1. Input
+    const uint8_t* keys = mfb_get_key_buffer(window);
+
+    if (keys[MFB_KB_KEY_RIGHT])
+        world_translation.x += 0.02f;
+
+    if (keys[MFB_KB_KEY_LEFT])
+        world_translation.x -= 0.02f;
+
+    if (keys[MFB_KB_KEY_UP])
+        world_translation.y -= 0.02f;
+
+    if (keys[MFB_KB_KEY_DOWN])
+        world_translation.y += 0.02f;
+
     ui_bridge_input(ctx, window);
-  int mouse_x = ctx->mouse_pos.x;
-int mouse_y = ctx->mouse_pos.y;
+
+    int mouse_x = ctx->mouse_pos.x;
+    int mouse_y = ctx->mouse_pos.y;
 
 //bool mouse_down = ctx->mouse_down & MU_MOUSE_LEFT;
 //bool mouse_pressed = mouse_down && !was_mouse_down;
