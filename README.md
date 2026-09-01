@@ -64,9 +64,11 @@ To keep the repository clean and the reports professional, follow these standard
 ---
 
 ## Table of Contents
+
 | Assignment | Link |
 | :--- | :--- |
-| **Project 1: My First Project** | [View Folder](./MyFirstProject/) |
+| **Homework 2** | [View Report](./assignments/HW2_Report.md) |
 
 ---
+
 *Note: Please ensure all internal links remain functional as you add new folders.*
