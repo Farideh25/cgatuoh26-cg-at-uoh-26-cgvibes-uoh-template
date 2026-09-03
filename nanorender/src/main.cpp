@@ -147,15 +147,16 @@ int main()
 
   Mesh mesh;
   glm::vec3 model_center(0.0f, 0.0f, 0.0f);
+  glm::vec3 min_corner(0.0f);
+  glm::vec3 max_corner(0.0f);
   float uniform_scale = 1.0f;
   glm::vec3 translation(0.0f, 0.0f, 0.0f);
   std::vector<glm::vec3> transformed_vertices;
+
   if (load_obj("wireframe_model.obj", mesh))
   {
     printf("Vertices loaded: %zu\n", mesh.vertices.size());
     printf("Faces loaded: %zu\n", mesh.faces.size());
-    glm::vec3 min_corner;
-    glm::vec3 max_corner;
 
     if (compute_bounding_box(mesh, min_corner, max_corner))
     {
@@ -253,6 +254,9 @@ int main()
   static glm::vec3 world_translation(0.0f, 0.0f, 0.0f);
   static glm::vec3 world_rotation(0.0f, 0.0f, 0.0f);
   static glm::vec3 world_scale(1.0f, 1.0f, 1.0f);
+  static int show_world_axes = 0;
+  static int show_local_axes = 0;
+  static int show_bounding_box = 0;
 
   // Set up char input callback for textbox input
   mfb_set_char_input_callback(
@@ -413,6 +417,13 @@ glm::mat4 final_transform_matrix =
     world_scale_matrix *
     local_transform_matrix;
 
+// Convert a 3D point from the current world/model space to screen pixels.
+auto to_screen = [&](const glm::vec3 &point)
+{
+    return point * uniform_scale + translation;
+};
+
+
 for (const glm::ivec3 &face : mesh.faces)
 {
     glm::vec4 local_v0 =
@@ -446,6 +457,145 @@ for (const glm::ivec3 &face : mesh.faces)
                 (int)v0.x, (int)v0.y,
                 wireframe_color);
     }
+  if (show_bounding_box)
+{
+    const uint32_t bounding_box_color = MFB_RGB(255, 255, 0);
+
+    glm::vec3 bounding_box_corners[8] =
+    {
+        glm::vec3(min_corner.x, min_corner.y, min_corner.z),
+        glm::vec3(max_corner.x, min_corner.y, min_corner.z),
+        glm::vec3(max_corner.x, max_corner.y, min_corner.z),
+        glm::vec3(min_corner.x, max_corner.y, min_corner.z),
+        glm::vec3(min_corner.x, min_corner.y, max_corner.z),
+        glm::vec3(max_corner.x, min_corner.y, max_corner.z),
+        glm::vec3(max_corner.x, max_corner.y, max_corner.z),
+        glm::vec3(min_corner.x, max_corner.y, max_corner.z)
+    };
+
+    glm::vec3 screen_corners[8];
+
+    for (int i = 0; i < 8; i++)
+    {
+        glm::vec4 transformed_corner =
+            final_transform_matrix * glm::vec4(bounding_box_corners[i], 1.0f);
+
+        screen_corners[i] = to_screen(glm::vec3(transformed_corner));
+    }
+
+    int bounding_box_edges[12][2] =
+    {
+        {0, 1}, {1, 2}, {2, 3}, {3, 0},
+        {4, 5}, {5, 6}, {6, 7}, {7, 4},
+        {0, 4}, {1, 5}, {2, 6}, {3, 7}
+    };
+
+    for (int i = 0; i < 12; i++)
+    {
+        int start_index = bounding_box_edges[i][0];
+        int end_index = bounding_box_edges[i][1];
+
+        draw_line((int)screen_corners[start_index].x,
+                  (int)screen_corners[start_index].y,
+                  (int)screen_corners[end_index].x,
+                  (int)screen_corners[end_index].y,
+                  bounding_box_color);
+    }
+}
+if (show_world_axes || show_local_axes)
+{
+    const uint32_t x_axis_color = MFB_RGB(255, 0, 0);
+    const uint32_t y_axis_color = MFB_RGB(0, 255, 0);
+    const uint32_t z_axis_color = MFB_RGB(0, 0, 255);
+
+    glm::vec3 box_size = max_corner - min_corner;
+    float axis_length =
+        glm::max(glm::max(box_size.x, box_size.y), box_size.z) * 0.35f;
+
+    if (axis_length <= 0.0f)
+    {
+        axis_length = 1.0f;
+    }
+
+    if (show_world_axes)
+    {
+        // World axes: fixed at the world origin.
+        glm::vec3 world_origin =
+            to_screen(glm::vec3(0.0f, 0.0f, 0.0f));
+
+        glm::vec3 world_x =
+            to_screen(glm::vec3(axis_length, 0.0f, 0.0f));
+
+        glm::vec3 world_y =
+            to_screen(glm::vec3(0.0f, axis_length, 0.0f));
+
+        glm::vec3 world_z =
+            to_screen(glm::vec3(0.0f, 0.0f, axis_length));
+
+        draw_line((int)world_origin.x, (int)world_origin.y,
+                  (int)world_x.x, (int)world_x.y,
+                  x_axis_color);
+
+        draw_line((int)world_origin.x, (int)world_origin.y,
+                  (int)world_y.x, (int)world_y.y,
+                  y_axis_color);
+
+        draw_line((int)world_origin.x, (int)world_origin.y,
+                  (int)world_z.x, (int)world_z.y,
+                  z_axis_color);
+    }
+
+    if (show_local_axes)
+    {
+        // Local axes: originate at the model center and transform with the model.
+        glm::vec4 local_origin_4 =
+            final_transform_matrix *
+            glm::vec4(model_center, 1.0f);
+
+        glm::vec4 local_x_4 =
+            final_transform_matrix *
+            glm::vec4(
+                model_center + glm::vec3(axis_length, 0.0f, 0.0f),
+                1.0f);
+
+        glm::vec4 local_y_4 =
+            final_transform_matrix *
+            glm::vec4(
+                model_center + glm::vec3(0.0f, axis_length, 0.0f),
+                1.0f);
+
+        glm::vec4 local_z_4 =
+            final_transform_matrix *
+            glm::vec4(
+                model_center + glm::vec3(0.0f, 0.0f, axis_length),
+                1.0f);
+
+        glm::vec3 local_origin =
+            to_screen(glm::vec3(local_origin_4));
+
+        glm::vec3 local_x =
+            to_screen(glm::vec3(local_x_4));
+
+        glm::vec3 local_y =
+            to_screen(glm::vec3(local_y_4));
+
+        glm::vec3 local_z =
+            to_screen(glm::vec3(local_z_4));
+
+        draw_line((int)local_origin.x, (int)local_origin.y,
+                  (int)local_x.x, (int)local_x.y,
+                  x_axis_color);
+
+        draw_line((int)local_origin.x, (int)local_origin.y,
+                  (int)local_y.x, (int)local_y.y,
+                  y_axis_color);
+
+        draw_line((int)local_origin.x, (int)local_origin.y,
+                  (int)local_z.x, (int)local_z.y,
+                  z_axis_color);
+    }
+}
+
 for (int i = 0; i < line_count; i++)
 {
   draw_line(lines[i].x0, lines[i].y0, lines[i].x1, lines[i].y1, lines[i].color);
@@ -457,8 +607,6 @@ if (is_drawing)
     // 3. UI Logic
     static float slider_val = 50.0f;
     static float number_val = 3.14f;
-    static int checkbox_a = 0;
-    static int checkbox_b = 1;
     static char textbox_buf[128] = "edit me";
     static bool quit_requested = false;
     static int show_message = 0;
@@ -497,10 +645,11 @@ if (is_drawing)
         quit_requested = false; // just a reaction
       }
 
-      // checkbox
+      // debug toggles
       mu_layout_row(ctx, 1, w1, 0);
-      mu_checkbox(ctx, "mu_checkbox A (off)", &checkbox_a);
-      mu_checkbox(ctx, "mu_checkbox B (on)", &checkbox_b);
+      mu_checkbox(ctx, "Show World Axes", &show_world_axes);
+      mu_checkbox(ctx, "Show Local Axes", &show_local_axes);
+      mu_checkbox(ctx, "Show Bounding Box", &show_bounding_box);
 
       // textbox
       mu_layout_row(ctx, 1, w1, 0);
