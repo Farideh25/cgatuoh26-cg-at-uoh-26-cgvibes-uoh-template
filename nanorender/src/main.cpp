@@ -76,6 +76,12 @@ struct Mesh
     std::vector<glm::vec3> vertices;
     std::vector<glm::ivec3> faces;
 };
+
+struct Camera
+{
+    glm::vec3 position;
+    glm::vec3 rotation;
+};
 bool load_obj(const char *filename, Mesh &mesh)
 {
     std::ifstream file(filename);
@@ -254,6 +260,10 @@ int main()
   static glm::vec3 world_translation(0.0f, 0.0f, 0.0f);
   static glm::vec3 world_rotation(0.0f, 0.0f, 0.0f);
   static glm::vec3 world_scale(1.0f, 1.0f, 1.0f);
+  static Camera camera{
+    glm::vec3(0.0f, 0.0f, 0.0f),
+    glm::vec3(0.0f, 0.0f, 0.0f)
+  };
   static int show_world_axes = 0;
   static int show_local_axes = 0;
   static int show_bounding_box = 0;
@@ -417,10 +427,43 @@ glm::mat4 final_transform_matrix =
     world_scale_matrix *
     local_transform_matrix;
 
-// Convert a 3D point from the current world/model space to screen pixels.
+glm::mat4 camera_translation_matrix =
+    glm::translate(glm::mat4(1.0f), camera.position);
+
+glm::mat4 camera_rotation_x =
+    glm::rotate(glm::mat4(1.0f),
+                glm::radians(camera.rotation.x),
+                glm::vec3(1.0f, 0.0f, 0.0f));
+
+glm::mat4 camera_rotation_y =
+    glm::rotate(glm::mat4(1.0f),
+                glm::radians(camera.rotation.y),
+                glm::vec3(0.0f, 1.0f, 0.0f));
+
+glm::mat4 camera_rotation_z =
+    glm::rotate(glm::mat4(1.0f),
+                glm::radians(camera.rotation.z),
+                glm::vec3(0.0f, 0.0f, 1.0f));
+
+glm::mat4 camera_rotation_matrix =
+    camera_rotation_z *
+    camera_rotation_y *
+    camera_rotation_x;
+
+glm::mat4 camera_transform_matrix =
+    camera_translation_matrix *
+    camera_rotation_matrix;
+
+glm::mat4 view_matrix =
+    glm::inverse(camera_transform_matrix);
+
+// Convert a world-space point through the camera view to screen pixels.
 auto to_screen = [&](const glm::vec3 &point)
 {
-    return point * uniform_scale + translation;
+    glm::vec4 view_point =
+        view_matrix * glm::vec4(point, 1.0f);
+
+    return glm::vec3(view_point) * uniform_scale + translation;
 };
 
 
@@ -436,13 +479,13 @@ for (const glm::ivec3 &face : mesh.faces)
         final_transform_matrix * glm::vec4(mesh.vertices[face.z], 1.0f);
 
     glm::vec3 v0 =
-        glm::vec3(local_v0) * uniform_scale + translation;
+        to_screen(glm::vec3(local_v0));
 
     glm::vec3 v1 =
-        glm::vec3(local_v1) * uniform_scale + translation;
+        to_screen(glm::vec3(local_v1));
 
     glm::vec3 v2 =
-        glm::vec3(local_v2) * uniform_scale + translation;
+        to_screen(glm::vec3(local_v2));
       uint32_t wireframe_color = MFB_RGB(255, 255, 255);
 
       draw_line((int)v0.x, (int)v0.y,
@@ -755,7 +798,7 @@ if (mu_button(ctx, "Clear Lines"))
 mu_end_window(ctx);
 }
 // --- Transformations window ---
-if (mu_begin_window(ctx, "Transformations", mu_rect(800, 20, 360, 950)))
+if (mu_begin_window(ctx, "Transformations", mu_rect(800, 20, 360, 900)))
 {
   int wt[] = {-1};
 
@@ -817,7 +860,28 @@ mu_number(ctx, &world_scale.y, 0.1f);
 
 mu_label(ctx, "World Scale Z:");
 mu_number(ctx, &world_scale.z, 0.1f);
-  mu_end_window(ctx);
+mu_layout_row(ctx, 1, wt, 0);
+mu_label(ctx, "Camera");
+
+mu_label(ctx, "Camera Position X:");
+mu_number(ctx, &camera.position.x, 0.1f);
+
+mu_label(ctx, "Camera Position Y:");
+mu_number(ctx, &camera.position.y, 0.1f);
+
+mu_label(ctx, "Camera Position Z:");
+mu_number(ctx, &camera.position.z, 0.1f);
+
+mu_label(ctx, "Camera Rotation X:");
+mu_number(ctx, &camera.rotation.x, 1.0f);
+
+mu_label(ctx, "Camera Rotation Y:");
+mu_number(ctx, &camera.rotation.y, 1.0f);
+
+mu_label(ctx, "Camera Rotation Z:");
+mu_number(ctx, &camera.rotation.z, 1.0f);
+
+mu_end_window(ctx);
 }
     // --- Panel window ---
     if (mu_begin_window(ctx, "Panel Demo", mu_rect(395, 20, 380, 200)))

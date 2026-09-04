@@ -45,3 +45,46 @@ Finally, I enabled only the bounding-box visualization and rotated the model aro
 ### Result
 
 The renderer can now independently display the fixed World coordinate frame, the model's Local coordinate frame, and its 3D wireframe bounding box. These debug visualizations make it easier to distinguish between transformations in world space and transformations relative to the model.
+
+---
+
+## Part 2 — The Virtual Camera (View Matrix)
+
+### Implementation
+
+For this part, I added a simple virtual camera with a position and rotation in world space.
+
+The camera is represented by a `Camera` struct containing two `glm::vec3` values:
+
+- `position`
+- `rotation`
+
+I also added UI controls for changing the camera position and rotation along the X, Y, and Z axes.
+
+The camera transform is constructed from its translation and rotation matrices. The View matrix is then calculated as the inverse of the camera transform:
+
+`View = inverse(Camera Transform)`
+
+This inverse is necessary because moving the camera is represented by applying the opposite transformation to the world.
+
+The existing model transformations are applied first. The resulting world-space points are then transformed by the View matrix before being converted to screen coordinates. Therefore, the rendering flow for this part is:
+
+`Model → View → Screen`
+
+This corresponds to the required graphics pipeline order `P * V * M * v`. Perspective projection is not added yet in this part, so the existing screen mapping is still used after the View transformation.
+
+The same View transformation is also applied consistently to the debugging geometry. The transformed bounding box and Local axes first follow the model transformation and then pass through the camera View matrix. The World axes do not receive the model transformation, but they do pass through the View matrix because they are part of the world viewed by the camera.
+
+### Verification
+
+To verify camera translation, I set the camera position to `(-1, 0, 0)` while keeping the camera rotation at zero. Moving the camera to the left caused the model to appear shifted to the right on the screen, which confirms that the inverse camera transformation is being applied correctly.
+
+![Camera translated left, causing the model to appear shifted right](./assets/HW3_image4.png)
+
+I also tested camera rotation by resetting the camera position to `(0, 0, 0)` and setting the Z rotation to `30` degrees. The rendered scene rotated in the opposite direction of the camera rotation, as expected from the inverse View transformation.
+
+![Scene viewed with a 30-degree camera rotation around the Z axis](./assets/HW3_image5.png)
+
+### Result
+
+The renderer now supports a virtual camera with controllable world-space position and rotation. The View matrix is constructed from the inverse camera transformation and is applied consistently to the model and the relevant debugging geometry. Camera translation and rotation were both verified visually.
