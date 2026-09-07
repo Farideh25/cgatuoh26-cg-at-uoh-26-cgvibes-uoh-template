@@ -88,3 +88,52 @@ I also tested camera rotation by resetting the camera position to `(0, 0, 0)` an
 ### Result
 
 The renderer now supports a virtual camera with controllable world-space position and rotation. The View matrix is constructed from the inverse camera transformation and is applied consistently to the model and the relevant debugging geometry. Camera translation and rotation were both verified visually.
+
+---
+
+## Part 3 - Perspective Projection
+
+### Implementation
+
+For this part, I added a perspective projection mode while preserving the existing orthographic view.
+
+The perspective projection is constructed using `glm::perspective`. The projection parameters are:
+
+- Field of View: `60` degrees
+- Aspect ratio: `WIDTH / HEIGHT`
+- Near clipping plane: `0.1`
+- Far clipping plane: `100.0`
+
+After the model transformation and View transformation, points in Perspective mode are multiplied by the Perspective Projection matrix. This produces homogeneous clip-space coordinates.
+
+The Perspective Divide is then performed explicitly by dividing the projected X, Y, and Z coordinates by the homogeneous `w` component:
+
+`NDC = clip.xyz / clip.w`
+
+The resulting Normalized Device Coordinates are converted from the `[-1, 1]` range to framebuffer pixel coordinates.
+
+The resulting Perspective rendering flow is therefore:
+
+`Model -> View -> Projection -> Perspective Divide -> Screen`
+
+I also added a `Projection Mode` button to the Transformations UI. The button toggles between `Orthographic` and `Perspective`. In Orthographic mode, the renderer continues to use the previous screen mapping, while Perspective mode applies the new projection matrix and Perspective Divide.
+
+Because the model, transformed bounding box, Local axes, and World axes all use the common screen-conversion function, the selected projection is applied consistently to the rendered scene and debugging geometry.
+
+### Verification
+
+To compare the two projection modes, I rotated the model by `20` degrees around the world X axis and `30` degrees around the world Y axis. The camera was positioned at `(0, 0, 5)` with zero camera rotation.
+
+First, I rendered the model using Orthographic projection. Increasing the camera's Z distance does not make the object smaller in this mode, and the model does not show perspective foreshortening.
+
+![Orthographic projection with the camera at Z = 5](./assets/HW3_image6.png)
+
+I then kept the same model transformation and camera position and switched only the Projection Mode to Perspective. The model became smaller with distance, and vertices at different depths were projected differently, producing a clear perspective effect.
+
+![Perspective projection with the same camera and model configuration](./assets/HW3_image7.png)
+
+This comparison verifies that the Perspective Projection matrix and Perspective Divide are being applied correctly.
+
+### Result
+
+The renderer now supports both Orthographic and Perspective projection modes. Perspective mode uses a 60-degree FOV, a window-based aspect ratio, Near and Far clipping-plane values, and an explicit Perspective Divide before converting the projected coordinates to screen pixels. The difference between Orthographic and Perspective projection was verified visually using the same camera and model configuration.

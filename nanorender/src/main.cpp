@@ -264,6 +264,13 @@ int main()
     glm::vec3(0.0f, 0.0f, 0.0f),
     glm::vec3(0.0f, 0.0f, 0.0f)
   };
+
+  // HW3 Part 3 - Perspective Projection parameters
+  static int use_perspective = 0;
+  static float perspective_fov = 60.0f;
+  static float near_plane = 0.1f;
+  static float far_plane = 100.0f;
+
   static int show_world_axes = 0;
   static int show_local_axes = 0;
   static int show_bounding_box = 0;
@@ -457,15 +464,41 @@ glm::mat4 camera_transform_matrix =
 glm::mat4 view_matrix =
     glm::inverse(camera_transform_matrix);
 
+float aspect_ratio =
+    static_cast<float>(WIDTH) / static_cast<float>(HEIGHT);
+
+glm::mat4 perspective_projection_matrix =
+    glm::perspective(
+        glm::radians(perspective_fov),
+        aspect_ratio,
+        near_plane,
+        far_plane);
+
 // Convert a world-space point through the camera view to screen pixels.
 auto to_screen = [&](const glm::vec3 &point)
 {
     glm::vec4 view_point =
         view_matrix * glm::vec4(point, 1.0f);
 
+    if (use_perspective)
+    {
+        glm::vec4 clip_point =
+            perspective_projection_matrix * view_point;
+
+        glm::vec3 ndc =
+            glm::vec3(clip_point) / clip_point.w;
+
+        float screen_x =
+            (ndc.x + 1.0f) * 0.5f * WIDTH;
+
+        float screen_y =
+            (1.0f - ndc.y) * 0.5f * HEIGHT;
+
+        return glm::vec3(screen_x, screen_y, ndc.z);
+    }
+
     return glm::vec3(view_point) * uniform_scale + translation;
 };
-
 
 for (const glm::ivec3 &face : mesh.faces)
 {
@@ -862,6 +895,12 @@ mu_label(ctx, "World Scale Z:");
 mu_number(ctx, &world_scale.z, 0.1f);
 mu_layout_row(ctx, 1, wt, 0);
 mu_label(ctx, "Camera");
+mu_label(ctx, "Projection Mode:");
+
+if (mu_button(ctx, use_perspective ? "Perspective" : "Orthographic"))
+{
+    use_perspective = !use_perspective;
+}
 
 mu_label(ctx, "Camera Position X:");
 mu_number(ctx, &camera.position.x, 0.1f);
