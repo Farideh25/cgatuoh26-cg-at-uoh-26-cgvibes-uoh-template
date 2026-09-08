@@ -75,6 +75,8 @@ struct Mesh
 {
     std::vector<glm::vec3> vertices;
     std::vector<glm::ivec3> faces;
+    std::vector<glm::vec3> face_normals;
+    std::vector<glm::vec3> vertex_normals;
 };
 
 struct Camera
@@ -141,6 +143,59 @@ bool compute_bounding_box(const Mesh &mesh, glm::vec3 &min_corner, glm::vec3 &ma
 
     return true;
 }
+void compute_face_normals(Mesh &mesh)
+{
+    mesh.face_normals.clear();
+    mesh.face_normals.reserve(mesh.faces.size());
+
+    for (const glm::ivec3 &face : mesh.faces)
+    {
+        const glm::vec3 &v0 = mesh.vertices[face.x];
+        const glm::vec3 &v1 = mesh.vertices[face.y];
+        const glm::vec3 &v2 = mesh.vertices[face.z];
+
+        glm::vec3 edge1 = v1 - v0;
+        glm::vec3 edge2 = v2 - v0;
+
+        glm::vec3 normal = glm::cross(edge2, edge1);
+        float normal_length = glm::length(normal);
+
+        if (normal_length > 0.0f)
+        {
+            normal /= normal_length;
+        }
+        else
+        {
+            normal = glm::vec3(0.0f);
+        }
+
+        mesh.face_normals.push_back(normal);
+    }
+}
+void compute_vertex_normals(Mesh &mesh)
+{
+    mesh.vertex_normals.assign(mesh.vertices.size(), glm::vec3(0.0f));
+
+    for (size_t i = 0; i < mesh.faces.size(); i++)
+    {
+        const glm::ivec3 &face = mesh.faces[i];
+        const glm::vec3 &face_normal = mesh.face_normals[i];
+
+        mesh.vertex_normals[face.x] += face_normal;
+        mesh.vertex_normals[face.y] += face_normal;
+        mesh.vertex_normals[face.z] += face_normal;
+    }
+
+    for (glm::vec3 &normal : mesh.vertex_normals)
+    {
+        float normal_length = glm::length(normal);
+
+        if (normal_length > 0.0f)
+        {
+            normal /= normal_length;
+        }
+    }
+}
 int main()
 {
     // Small GLM example
@@ -163,6 +218,12 @@ int main()
   {
     printf("Vertices loaded: %zu\n", mesh.vertices.size());
     printf("Faces loaded: %zu\n", mesh.faces.size());
+    compute_face_normals(mesh);
+    printf("Face normals computed: %zu\n", mesh.face_normals.size());
+
+    compute_vertex_normals(mesh);
+    printf("Vertex normals computed: %zu\n", mesh.vertex_normals.size());
+
 
     if (compute_bounding_box(mesh, min_corner, max_corner))
     {
@@ -274,6 +335,7 @@ int main()
   static int show_world_axes = 0;
   static int show_local_axes = 0;
   static int show_bounding_box = 0;
+  static int show_normals = 0;
 
   // Set up char input callback for textbox input
   mfb_set_char_input_callback(
@@ -533,6 +595,83 @@ for (const glm::ivec3 &face : mesh.faces)
                 (int)v0.x, (int)v0.y,
                 wireframe_color);
     }
+if (show_normals)
+{
+    const uint32_t face_normal_color = MFB_RGB(0, 255, 255);
+    const uint32_t vertex_normal_color = MFB_RGB(255, 0, 255);
+
+    glm::vec3 box_size = max_corner - min_corner;
+    float normal_length =
+        glm::max(glm::max(box_size.x, box_size.y), box_size.z) * 0.20f;
+
+    if (normal_length <= 0.0f)
+    {
+        normal_length = 0.5f;
+    }
+
+    // Draw face normals from the center of each triangle.
+    for (size_t i = 0; i < mesh.faces.size(); i++)
+    {
+        const glm::ivec3 &face = mesh.faces[i];
+
+        glm::vec3 face_center =
+            (mesh.vertices[face.x] +
+             mesh.vertices[face.y] +
+             mesh.vertices[face.z]) / 3.0f;
+
+        glm::vec3 normal_end =
+            face_center + mesh.face_normals[i] * normal_length;
+
+        glm::vec4 transformed_center =
+            final_transform_matrix *
+            glm::vec4(face_center, 1.0f);
+
+        glm::vec4 transformed_end =
+            final_transform_matrix *
+            glm::vec4(normal_end, 1.0f);
+
+        glm::vec3 screen_center =
+            to_screen(glm::vec3(transformed_center));
+
+        glm::vec3 screen_end =
+            to_screen(glm::vec3(transformed_end));
+
+        draw_line((int)screen_center.x,
+                  (int)screen_center.y,
+                  (int)screen_end.x,
+                  (int)screen_end.y,
+                  face_normal_color);
+    }
+
+    // Draw vertex normals from each mesh vertex.
+    for (size_t i = 0; i < mesh.vertices.size(); i++)
+    {
+        glm::vec3 vertex = mesh.vertices[i];
+
+        glm::vec3 normal_end =
+            vertex + mesh.vertex_normals[i] * normal_length;
+
+        glm::vec4 transformed_vertex =
+            final_transform_matrix *
+            glm::vec4(vertex, 1.0f);
+
+        glm::vec4 transformed_end =
+            final_transform_matrix *
+            glm::vec4(normal_end, 1.0f);
+
+        glm::vec3 screen_vertex =
+            to_screen(glm::vec3(transformed_vertex));
+
+        glm::vec3 screen_end =
+            to_screen(glm::vec3(transformed_end));
+
+        draw_line((int)screen_vertex.x,
+                  (int)screen_vertex.y,
+                  (int)screen_end.x,
+                  (int)screen_end.y,
+                  vertex_normal_color);
+    }
+}
   if (show_bounding_box)
 {
     const uint32_t bounding_box_color = MFB_RGB(255, 255, 0);
@@ -726,6 +865,7 @@ if (is_drawing)
       mu_checkbox(ctx, "Show World Axes", &show_world_axes);
       mu_checkbox(ctx, "Show Local Axes", &show_local_axes);
       mu_checkbox(ctx, "Show Bounding Box", &show_bounding_box);
+      mu_checkbox(ctx, "Draw Normals", &show_normals);
 
       // textbox
       mu_layout_row(ctx, 1, w1, 0);

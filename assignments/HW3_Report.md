@@ -137,3 +137,85 @@ This comparison verifies that the Perspective Projection matrix and Perspective 
 ### Result
 
 The renderer now supports both Orthographic and Perspective projection modes. Perspective mode uses a 60-degree FOV, a window-based aspect ratio, Near and Far clipping-plane values, and an explicit Perspective Divide before converting the projected coordinates to screen pixels. The difference between Orthographic and Perspective projection was verified visually using the same camera and model configuration.
+---
+
+## Part 4 - Calculating Normals
+
+### Implementation
+
+For this part, I added support for calculating both Face Normals and Vertex Normals for the loaded mesh.
+
+Two new arrays were added to the `Mesh` structure:
+
+- `face_normals`
+- `vertex_normals`
+
+#### Face Normals
+
+A Face Normal is calculated for each triangle using two of its edges.
+
+For a triangle with vertices `v0`, `v1`, and `v2`, two edge vectors are constructed:
+
+`edge1 = v1 - v0`
+
+`edge2 = v2 - v0`
+
+The normal direction is then calculated using the cross product. For the winding order used by the current OBJ model, the outward-facing direction is obtained using:
+
+`normal = cross(edge2, edge1)`
+
+The resulting vector is normalized so that every Face Normal has unit length.
+
+The cross-product order is important because reversing the order reverses the direction of the resulting normal. During verification, the original cross-product order produced normals pointing inward. Reversing the order made the normals point outward consistently with the winding of the loaded model.
+
+#### Vertex Normals
+
+A Vertex Normal is calculated by accumulating the Face Normals of all triangles that share the vertex.
+
+Each Vertex Normal is initially set to `(0, 0, 0)`. For every triangle, its Face Normal is added to the three vertices belonging to that triangle. After all adjacent Face Normals have been accumulated, each resulting vector is normalized.
+
+This produces a direction representing the average orientation of the faces surrounding each vertex and can later be used for smooth shading.
+
+#### Normal Visualization
+
+I added a `Draw Normals` checkbox to the debugging UI.
+
+When enabled, the renderer draws:
+
+- Face Normals in cyan.
+- Vertex Normals in magenta.
+
+Each Face Normal is drawn as a short line starting at the center of its triangle.
+
+Each Vertex Normal is drawn as a short line starting directly from its vertex.
+
+The normal length is scaled relative to the model bounding-box size so that the debugging lines remain clearly visible.
+
+Both endpoints of every normal line are transformed using the same `final_transform_matrix` as the model and are then passed through the existing screen-conversion pipeline. Therefore, the normals remain attached to the model and transform correctly when the model is moved, scaled, or rotated.
+
+### Verification
+
+The loaded test model contains `12` triangular faces and `8` vertices. The calculation produced exactly:
+
+- `12` Face Normals
+- `8` Vertex Normals
+
+During numerical verification, all calculated normals had a length of approximately `1.00`, confirming that they were normalized correctly.
+
+I also verified the normal directions visually using the `Draw Normals` debug option. The Face Normals point outward from the centers of the triangles, while the Vertex Normals point outward from the vertices according to the surrounding face directions.
+
+To verify that the normals transform correctly with the model, I set the World Rotation to:
+
+- X = `20` degrees
+- Y = `30` degrees
+- Z = `0` degrees
+
+Both the cyan Face Normals and magenta Vertex Normals rotated together with the wireframe model while remaining attached to their corresponding faces and vertices.
+
+![Face and Vertex Normals displayed after rotating the model](./assets/HW3_image8.png)
+
+### Result
+
+The renderer can now calculate and store both Face Normals and Vertex Normals for the loaded mesh. Face Normals are computed using the cross product of triangle edges, while Vertex Normals are obtained from the normalized sum of adjacent Face Normals.
+
+The `Draw Normals` debugging option provides a visual verification of both types of normals. The normals point outward from the model and transform correctly together with the model, providing the geometric information required for later lighting and shading calculations.
