@@ -50,3 +50,54 @@ The resulting image consists of overlapping solid-colored rectangles. Their posi
 The renderer can now calculate and visualize the 2D screen-space bounding rectangle of every triangle in the mesh. This provides the pixel region that will be used in the next part for triangle inclusion testing with Barycentric Coordinates.
 
 ---
+
+## Part 2 - Triangle Rasterization with Barycentric Coordinates
+
+### Implementation
+
+In this part, I replaced the bounding-box-only fill from Part 1 with an actual triangle rasterization test based on Barycentric Coordinates.
+
+I first added a helper function named `compute_barycentric(...)` that receives the three triangle vertices in screen space together with a pixel position `(x, y)` and computes the three barycentric weights:
+
+- `alpha`
+- `beta`
+- `gamma`
+
+The function uses the standard 2D barycentric-coordinate formula in screen space.
+I also added a small safety check for degenerate triangles: if the denominator is close to zero, the function returns invalid values instead of dividing by zero.
+
+The rasterization process still begins by computing the screen-space bounding rectangle of each projected triangle, exactly as in Part 1. Then, instead of coloring the entire rectangle, the renderer iterates over all pixels inside the rectangle and computes the barycentric coordinates of each pixel relative to the triangle.
+
+A pixel is filled only if all three barycentric weights satisfy:
+
+- `0 <= alpha <= 1`
+- `0 <= beta <= 1`
+- `0 <= gamma <= 1`
+
+If these conditions hold, the pixel lies inside the triangle and is colored using the face color stored in `mesh.face_colors`.
+
+To reflect the new behavior, I also renamed the UI checkbox from `Triangle Bounding Boxes` to `Filled Triangles`.
+
+When the option is disabled, the original white wireframe rendering is still shown.
+
+### Verification
+
+I enabled `Filled Triangles` and rotated the model using:
+
+- World Rotation X = `20`
+- World Rotation Y = `30`
+- World Rotation Z = `0`
+
+The resulting image shows solid-colored triangles instead of the colored axis-aligned rectangles from Part 1. This confirms that pixels are no longer filled only according to the bounding rectangle, but according to actual triangle membership computed with barycentric coordinates.
+
+I also verified that disabling `Filled Triangles` still restores the original wireframe rendering.
+
+At this stage, some triangles may visually overlap in an incorrect front-to-back order. This is expected, because depth testing has not been implemented yet.
+
+![Filled triangle rasterization using barycentric coordinates](./assets/HW4_image2.png)
+
+### Result
+
+The renderer can now rasterize each triangle itself, rather than only its bounding rectangle. Barycentric coordinates are used to determine whether a screen pixel lies inside the triangle, which provides the correct foundation for the next part: interpolating depth values and implementing a Z-buffer.
+
+---

@@ -85,6 +85,39 @@ struct Camera
     glm::vec3 position;
     glm::vec3 rotation;
 };
+// HW4 Part 2 - Compute barycentric coordinates in screen space.
+glm::vec3 compute_barycentric(
+    const glm::vec3 &v0,
+    const glm::vec3 &v1,
+    const glm::vec3 &v2,
+    float x,
+    float y)
+{
+    float denominator =
+        (v1.y - v2.y) * (v0.x - v2.x) +
+        (v2.x - v1.x) * (v0.y - v2.y);
+
+    // Degenerate triangle - barycentric coordinates are undefined.
+    if (glm::abs(denominator) < 0.000001f)
+    {
+        return glm::vec3(-1.0f);
+    }
+
+    float alpha =
+        ((v1.y - v2.y) * (x - v2.x) +
+         (v2.x - v1.x) * (y - v2.y)) /
+        denominator;
+
+    float beta =
+        ((v2.y - v0.y) * (x - v2.x) +
+         (v0.x - v2.x) * (y - v2.y)) /
+        denominator;
+
+    float gamma = 1.0f - alpha - beta;
+
+    return glm::vec3(alpha, beta, gamma);
+}
+
 bool load_obj(const char *filename, Mesh &mesh)
 {
     std::ifstream file(filename);
@@ -348,7 +381,7 @@ int main()
   static int show_local_axes = 0;
   static int show_bounding_box = 0;
   static int show_normals = 0;
-  static int show_triangle_bounding_boxes = 0;
+  static int show_filled_triangles = 0;
 
   // Set up char input callback for textbox input
   mfb_set_char_input_callback(
@@ -615,20 +648,32 @@ for (size_t face_index = 0; face_index < mesh.faces.size(); face_index++)
     min_y = glm::max(min_y, 0);
     max_y = glm::min(max_y, HEIGHT - 1);
 
-    if (show_triangle_bounding_boxes)
-    {
-        uint32_t face_color = mesh.face_colors[face_index];
+if (show_filled_triangles)
+{
+    uint32_t face_color = mesh.face_colors[face_index];
 
-        for (int y = min_y; y <= max_y; y++)
+    for (int y = min_y; y <= max_y; y++)
+    {
+        for (int x = min_x; x <= max_x; x++)
         {
-            for (int x = min_x; x <= max_x; x++)
+            glm::vec3 barycentric =
+                compute_barycentric(v0, v1, v2, (float)x, (float)y);
+
+            float alpha = barycentric.x;
+            float beta = barycentric.y;
+            float gamma = barycentric.z;
+
+            if (alpha >= 0.0f && alpha <= 1.0f &&
+                beta >= 0.0f && beta <= 1.0f &&
+                gamma >= 0.0f && gamma <= 1.0f)
             {
                 put_pixel(x, y, face_color);
             }
         }
     }
-    else
-    {
+}
+else
+{
         uint32_t wireframe_color = MFB_RGB(255, 255, 255);
 
         draw_line((int)v0.x, (int)v0.y,
@@ -915,7 +960,7 @@ if (is_drawing)
       mu_checkbox(ctx, "Show Local Axes", &show_local_axes);
       mu_checkbox(ctx, "Show Bounding Box", &show_bounding_box);
       mu_checkbox(ctx, "Draw Normals", &show_normals);
-      mu_checkbox(ctx, "Triangle Bounding Boxes", &show_triangle_bounding_boxes);
+      mu_checkbox(ctx, "Filled Triangles", &show_filled_triangles);
 
       // textbox
       mu_layout_row(ctx, 1, w1, 0);
