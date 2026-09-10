@@ -77,6 +77,7 @@ struct Mesh
     std::vector<glm::ivec3> faces;
     std::vector<glm::vec3> face_normals;
     std::vector<glm::vec3> vertex_normals;
+    std::vector<uint32_t> face_colors;
 };
 
 struct Camera
@@ -218,6 +219,17 @@ int main()
   {
     printf("Vertices loaded: %zu\n", mesh.vertices.size());
     printf("Faces loaded: %zu\n", mesh.faces.size());
+    mesh.face_colors.clear();
+    mesh.face_colors.reserve(mesh.faces.size());
+
+    for (size_t i = 0; i < mesh.faces.size(); i++)
+    {
+        int r = 64 + rand() % 192;
+        int g = 64 + rand() % 192;
+        int b = 64 + rand() % 192;
+
+        mesh.face_colors.push_back(MFB_RGB(r, g, b));
+    }
     compute_face_normals(mesh);
     printf("Face normals computed: %zu\n", mesh.face_normals.size());
 
@@ -336,6 +348,7 @@ int main()
   static int show_local_axes = 0;
   static int show_bounding_box = 0;
   static int show_normals = 0;
+  static int show_triangle_bounding_boxes = 0;
 
   // Set up char input callback for textbox input
   mfb_set_char_input_callback(
@@ -562,8 +575,10 @@ auto to_screen = [&](const glm::vec3 &point)
     return glm::vec3(view_point) * uniform_scale + translation;
 };
 
-for (const glm::ivec3 &face : mesh.faces)
+for (size_t face_index = 0; face_index < mesh.faces.size(); face_index++)
 {
+    const glm::ivec3 &face = mesh.faces[face_index];
+
     glm::vec4 local_v0 =
         final_transform_matrix * glm::vec4(mesh.vertices[face.x], 1.0f);
 
@@ -581,20 +596,54 @@ for (const glm::ivec3 &face : mesh.faces)
 
     glm::vec3 v2 =
         to_screen(glm::vec3(local_v2));
-      uint32_t wireframe_color = MFB_RGB(255, 255, 255);
 
-      draw_line((int)v0.x, (int)v0.y,
-                (int)v1.x, (int)v1.y,
-                wireframe_color);
+    // HW4 Part 1 - Screen-space bounding rectangle of the triangle.
+    int min_x = (int)glm::floor(
+        glm::min(v0.x, glm::min(v1.x, v2.x)));
 
-      draw_line((int)v1.x, (int)v1.y,
-                (int)v2.x, (int)v2.y,
-                wireframe_color);
+    int max_x = (int)glm::ceil(
+        glm::max(v0.x, glm::max(v1.x, v2.x)));
 
-      draw_line((int)v2.x, (int)v2.y,
-                (int)v0.x, (int)v0.y,
-                wireframe_color);
+    int min_y = (int)glm::floor(
+        glm::min(v0.y, glm::min(v1.y, v2.y)));
+
+    int max_y = (int)glm::ceil(
+        glm::max(v0.y, glm::max(v1.y, v2.y)));
+
+    min_x = glm::max(min_x, 0);
+    max_x = glm::min(max_x, WIDTH - 1);
+    min_y = glm::max(min_y, 0);
+    max_y = glm::min(max_y, HEIGHT - 1);
+
+    if (show_triangle_bounding_boxes)
+    {
+        uint32_t face_color = mesh.face_colors[face_index];
+
+        for (int y = min_y; y <= max_y; y++)
+        {
+            for (int x = min_x; x <= max_x; x++)
+            {
+                put_pixel(x, y, face_color);
+            }
+        }
     }
+    else
+    {
+        uint32_t wireframe_color = MFB_RGB(255, 255, 255);
+
+        draw_line((int)v0.x, (int)v0.y,
+                  (int)v1.x, (int)v1.y,
+                  wireframe_color);
+
+        draw_line((int)v1.x, (int)v1.y,
+                  (int)v2.x, (int)v2.y,
+                  wireframe_color);
+
+        draw_line((int)v2.x, (int)v2.y,
+                  (int)v0.x, (int)v0.y,
+                  wireframe_color);
+    }
+}
 if (show_normals)
 {
     const uint32_t face_normal_color = MFB_RGB(0, 255, 255);
@@ -866,6 +915,7 @@ if (is_drawing)
       mu_checkbox(ctx, "Show Local Axes", &show_local_axes);
       mu_checkbox(ctx, "Show Bounding Box", &show_bounding_box);
       mu_checkbox(ctx, "Draw Normals", &show_normals);
+      mu_checkbox(ctx, "Triangle Bounding Boxes", &show_triangle_bounding_boxes);
 
       // textbox
       mu_layout_row(ctx, 1, w1, 0);
