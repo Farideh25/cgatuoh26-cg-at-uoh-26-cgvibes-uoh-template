@@ -86,6 +86,20 @@ struct Camera
     glm::vec3 position;
     glm::vec3 rotation;
 };
+struct PointLight
+{
+    glm::vec3 position;
+    glm::vec3 ambient;
+    glm::vec3 diffuse;
+    glm::vec3 specular;
+};
+
+struct Material
+{
+    glm::vec3 ambient;
+    glm::vec3 diffuse;
+    glm::vec3 specular;
+};
 // HW4 Part 2 - Compute barycentric coordinates in screen space.
 glm::vec3 compute_barycentric(
     const glm::vec3 &v0,
@@ -371,7 +385,19 @@ int main()
     glm::vec3(0.0f, 0.0f, 0.0f),
     glm::vec3(0.0f, 0.0f, 0.0f)
   };
+// HW5 Part 1 - Point light and material properties
+static PointLight point_light{
+  glm::vec3(2.0f, 2.0f, 2.0f),
+  glm::vec3(1.0f, 1.0f, 1.0f),
+  glm::vec3(1.0f, 1.0f, 1.0f),
+  glm::vec3(1.0f, 1.0f, 1.0f)
+};
 
+static Material material{
+  glm::vec3(0.7f, 0.2f, 0.2f),
+  glm::vec3(0.7f, 0.2f, 0.2f),
+  glm::vec3(1.0f, 1.0f, 1.0f)
+};
   // HW3 Part 3 - Perspective Projection parameters
   static int use_perspective = 0;
   static float perspective_fov = 60.0f;
@@ -653,7 +679,17 @@ for (size_t face_index = 0; face_index < mesh.faces.size(); face_index++)
 
 if (show_filled_triangles || show_z_buffer)
 {
-    uint32_t face_color = mesh.face_colors[face_index];
+// HW5 Part 1 - Ambient lighting
+glm::vec3 ambient_color =
+    point_light.ambient * material.ambient;
+
+ambient_color =
+    glm::clamp(ambient_color, glm::vec3(0.0f), glm::vec3(1.0f));
+
+uint32_t face_color = MFB_RGB(
+    (int)(ambient_color.r * 255.0f),
+    (int)(ambient_color.g * 255.0f),
+    (int)(ambient_color.b * 255.0f));
 
     for (int y = min_y; y <= max_y; y++)
     {
@@ -1212,6 +1248,58 @@ mu_label(ctx, "Camera Rotation Z:");
 mu_number(ctx, &camera.rotation.z, 1.0f);
 
 mu_end_window(ctx);
+}
+// --- HW5 Part 1: Lighting window ---
+if (mu_begin_window(ctx, "Lighting", mu_rect(1180, 20, 380, 820)))
+{
+  int wl[] = {-1};
+
+  mu_layout_row(ctx, 1, wl, 0);
+  mu_label(ctx, "Point Light");
+
+  mu_label(ctx, "Light Position X:");
+  mu_number(ctx, &point_light.position.x, 0.1f);
+
+  mu_label(ctx, "Light Position Y:");
+  mu_number(ctx, &point_light.position.y, 0.1f);
+
+  mu_label(ctx, "Light Position Z:");
+  mu_number(ctx, &point_light.position.z, 0.1f);
+mu_layout_row(ctx, 1, wl, 0);
+mu_label(ctx, "Ambient Color");
+
+mu_label(ctx, "Ambient R:");
+mu_slider(ctx, &point_light.ambient.r, 0.0f, 1.0f);
+
+mu_label(ctx, "Ambient G:");
+mu_slider(ctx, &point_light.ambient.g, 0.0f, 1.0f);
+
+mu_label(ctx, "Ambient B:");
+mu_slider(ctx, &point_light.ambient.b, 0.0f, 1.0f);
+mu_layout_row(ctx, 1, wl, 0);
+mu_label(ctx, "Diffuse Color");
+
+mu_label(ctx, "Diffuse R:");
+mu_slider(ctx, &point_light.diffuse.r, 0.0f, 1.0f);
+
+mu_label(ctx, "Diffuse G:");
+mu_slider(ctx, &point_light.diffuse.g, 0.0f, 1.0f);
+
+mu_label(ctx, "Diffuse B:");
+mu_slider(ctx, &point_light.diffuse.b, 0.0f, 1.0f);
+
+mu_layout_row(ctx, 1, wl, 0);
+mu_label(ctx, "Specular Color");
+
+mu_label(ctx, "Specular R:");
+mu_slider(ctx, &point_light.specular.r, 0.0f, 1.0f);
+
+mu_label(ctx, "Specular G:");
+mu_slider(ctx, &point_light.specular.g, 0.0f, 1.0f);
+
+mu_label(ctx, "Specular B:");
+mu_slider(ctx, &point_light.specular.b, 0.0f, 1.0f);
+  mu_end_window(ctx);
 }
     // --- Panel window ---
     if (mu_begin_window(ctx, "Panel Demo", mu_rect(395, 20, 380, 200)))
