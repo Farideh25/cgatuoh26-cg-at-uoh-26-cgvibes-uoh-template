@@ -101,3 +101,60 @@ At this stage, some triangles may visually overlap in an incorrect front-to-back
 The renderer can now rasterize each triangle itself, rather than only its bounding rectangle. Barycentric coordinates are used to determine whether a screen pixel lies inside the triangle, which provides the correct foundation for the next part: interpolating depth values and implementing a Z-buffer.
 
 ---
+## Part 3 - Z-Buffer Algorithm
+
+### Implementation
+
+In this part, I added a Z-buffer to solve the visibility problem that was still present after triangle rasterization in Part 2.
+
+I added a floating-point depth buffer named `g_z_buffer` with the same number of entries as the color framebuffer. At the beginning of every frame, each depth value is initialized to a very large value (`1e30f`), representing a pixel for which no geometry has been drawn yet.
+
+For every pixel that passes the barycentric triangle inclusion test, I calculate its interpolated Z value using the same barycentric weights:
+
+`interpolated_z = alpha * v0.z + beta * v1.z + gamma * v2.z`
+
+The existing projection pipeline stores different forms of Z depending on the active projection mode. In Perspective mode, `to_screen(...)` returns the Z coordinate after the perspective divide, so the triangle vertices contain NDC Z values. In Orthographic mode, the Z coordinate is derived from the view-space position and the existing screen transformation.
+
+To use one consistent depth comparison in both modes, I convert the interpolated value to a depth value for which smaller values represent geometry closer to the camera. Perspective mode uses the interpolated Z directly, while Orthographic mode uses its negated value.
+
+For each covered pixel, the calculated depth is compared with the value currently stored in `g_z_buffer`. The pixel is written to the color buffer only if its new depth is smaller than the stored depth. When this happens, both the Z-buffer and the color buffer are updated.
+
+This prevents triangles processed later in the face loop from incorrectly overwriting geometry that is actually closer to the camera.
+
+I also added a new UI checkbox:
+
+- `Show Z-Buffer`
+
+The Z-buffer mode can rasterize the model even when `Filled Triangles` is disabled. After rasterization, the visible depth values are normalized to a grayscale range. Pixels containing geometry are displayed according to their depth, while pixels that were not reached by any triangle are displayed as white background.
+
+The depth visualization is applied before the UI is rendered, so the application controls remain visible on top of the grayscale depth map.
+
+### Verification
+
+I first verified the depth test using Orthographic projection with:
+
+- World Rotation X = `20`
+- World Rotation Y = `30`
+- World Rotation Z = `0`
+- World Translation = `(0, 0, 0)`
+- World Scale = `(1, 1, 1)`
+
+With `Filled Triangles` enabled and `Show Z-Buffer` disabled, the model is rendered as solid colored geometry. The incorrect front-to-back triangle overlaps visible in Part 2 no longer occur, confirming that the visible surface is selected using the per-pixel depth test rather than face drawing order.
+
+I also verified the depth test in Perspective projection using the same model rotation and a camera position of `(0, 0, 5)`. The visibility result remained correct in Perspective mode.
+
+Finally, I enabled `Show Z-Buffer` and disabled `Filled Triangles`. The model was displayed as a continuous grayscale depth map instead of using the random face colors. The grayscale values vary across the surfaces according to their interpolated per-pixel depth, confirming that the visualization is generated from the Z-buffer values.
+
+The following images show the Color Buffer and Z-Buffer from the same Orthographic view:
+
+| Color Buffer | Z-Buffer |
+| --- | --- |
+| ![Solid model after Z-buffer depth testing](./assets/HW4_image3.png) | ![Z-buffer grayscale depth visualization](./assets/HW4_image4.png) |
+
+### Result
+
+The renderer now performs per-pixel hidden-surface removal using a Z-buffer. Each rasterized pixel receives an interpolated depth value, and only the closest visible sample is allowed to update the color framebuffer.
+
+The implementation works with both the existing Orthographic and Perspective projection modes. A dedicated Z-buffer visualization mode also makes it possible to inspect the stored depth information directly as a grayscale image.
+
+---

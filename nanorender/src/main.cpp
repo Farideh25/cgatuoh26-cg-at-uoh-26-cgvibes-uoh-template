@@ -20,6 +20,7 @@ extern "C"
 #define HEIGHT 1200
 
 static uint32_t g_buffer[WIDTH * HEIGHT];
+static float g_z_buffer[WIDTH * HEIGHT];
 void put_pixel(int x, int y, uint32_t color)
 {
   if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT)
@@ -382,6 +383,7 @@ int main()
   static int show_bounding_box = 0;
   static int show_normals = 0;
   static int show_filled_triangles = 0;
+  static int show_z_buffer = 0;
 
   // Set up char input callback for textbox input
   mfb_set_char_input_callback(
@@ -474,6 +476,7 @@ b = ((x & y) + (int)(color_shift * 0.25f)) % 255;
         b = (x * 255) / WIDTH;
       }
       g_buffer[i] = MFB_RGB(r, g, b);
+      g_z_buffer[i] = 1e30f;
     }
     glm::mat4 local_scale_matrix =
         glm::translate(glm::mat4(1.0f), model_center);
@@ -648,7 +651,7 @@ for (size_t face_index = 0; face_index < mesh.faces.size(); face_index++)
     min_y = glm::max(min_y, 0);
     max_y = glm::min(max_y, HEIGHT - 1);
 
-if (show_filled_triangles)
+if (show_filled_triangles || show_z_buffer)
 {
     uint32_t face_color = mesh.face_colors[face_index];
 
@@ -667,7 +670,21 @@ if (show_filled_triangles)
                 beta >= 0.0f && beta <= 1.0f &&
                 gamma >= 0.0f && gamma <= 1.0f)
             {
-                put_pixel(x, y, face_color);
+                float interpolated_z =
+                    alpha * v0.z +
+                    beta * v1.z +
+                    gamma * v2.z;
+
+                float depth =
+                    use_perspective ? interpolated_z : -interpolated_z;
+
+                int pixel_index = y * WIDTH + x;
+
+                if (depth < g_z_buffer[pixel_index])
+                {
+                    g_z_buffer[pixel_index] = depth;
+                    put_pixel(x, y, face_color);
+                }
             }
         }
     }
@@ -913,13 +930,51 @@ if (is_drawing)
 {
   draw_line(start_x, start_y, current_x, current_y, MFB_RGB((int)line_r, (int)line_g, (int)line_b));
 }
+if (show_z_buffer)
+{
+    float min_depth = 1e30f;
+    float max_depth = -1e30f;
+
+    // Find the visible depth range.
+    for (int i = 0; i < WIDTH * HEIGHT; i++)
+    {
+        if (g_z_buffer[i] < 1e29f)
+        {
+            min_depth = glm::min(min_depth, g_z_buffer[i]);
+            max_depth = glm::max(max_depth, g_z_buffer[i]);
+        }
+    }
+
+    // Map depth values to grayscale.
+    for (int i = 0; i < WIDTH * HEIGHT; i++)
+    {
+        if (g_z_buffer[i] >= 1e29f)
+        {
+            g_buffer[i] = MFB_RGB(255, 255, 255);
+            continue;
+        }
+
+        float normalized_depth = 0.0f;
+
+        if (max_depth > min_depth)
+        {
+            normalized_depth =
+                (g_z_buffer[i] - min_depth) /
+                (max_depth - min_depth);
+        }
+
+        int gray =
+            (int)(normalized_depth * 255.0f);
+
+        g_buffer[i] = MFB_RGB(gray, gray, gray);
+    }
+}
     // 3. UI Logic
     static float slider_val = 50.0f;
     static float number_val = 3.14f;
     static char textbox_buf[128] = "edit me";
     static bool quit_requested = false;
     static int show_message = 0;
-    
 
     mu_begin(ctx);
 
@@ -961,6 +1016,7 @@ if (is_drawing)
       mu_checkbox(ctx, "Show Bounding Box", &show_bounding_box);
       mu_checkbox(ctx, "Draw Normals", &show_normals);
       mu_checkbox(ctx, "Filled Triangles", &show_filled_triangles);
+      mu_checkbox(ctx, "Show Z-Buffer", &show_z_buffer);
 
       // textbox
       mu_layout_row(ctx, 1, w1, 0);
