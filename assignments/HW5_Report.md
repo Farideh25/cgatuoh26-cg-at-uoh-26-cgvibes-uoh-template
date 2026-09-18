@@ -72,3 +72,103 @@ The renderer now contains explicit Point Light and Material properties and suppo
 Ambient lighting is calculated from the light and material Ambient colors and is used as the solid model color. The result is intentionally flat and independent of the light position, providing the foundation for the directional Diffuse lighting that will be implemented in Part 2.
 
 ---
+## Part 2 - Flat Shading (Diffuse Lighting)
+
+### Implementation
+
+In this part, I extended the Ambient lighting implementation from Part 1 by adding Diffuse lighting using Lambert's Cosine Law.
+
+The lighting calculation is performed once per triangle, producing a single uniform color for all pixels belonging to that triangle.
+
+To ensure that the lighting calculations use a consistent coordinate system, I performed them in World Space.
+
+For each triangle, I calculated its center using the three transformed vertices:
+
+`triangle_center = (v0 + v1 + v2) / 3.0`
+
+I then calculated the face normal using the edges of the transformed triangle.
+
+The normal was computed using the same cross-product order as the existing face-normal implementation and normalized before being used in the lighting calculation.
+
+I also added a check to avoid division by zero when the normal has a very small length.
+
+Next, I calculated the direction from the triangle center toward the point light:
+
+`light_direction = point_light.position - triangle_center_world`
+
+The light direction was normalized, with an additional check to avoid division by zero.
+
+The Diffuse factor is calculated using Lambert's Cosine Law:
+
+`diffuse_factor = max(dot(face_normal_world, light_direction), 0.0)`
+
+This ensures that the Diffuse contribution cannot be negative.
+
+The Diffuse color is calculated using component-wise multiplication:
+
+`diffuse_color = point_light.diffuse * material.diffuse * diffuse_factor`
+
+Finally, I combined the Ambient and Diffuse components:
+
+`final_color = ambient_color + diffuse_color`
+
+The resulting RGB values are clamped to the range `0 ... 1` and converted to the framebuffer's `0 ... 255` RGB representation.
+
+The final color is calculated once per triangle, before the rasterization loops, and is used for all pixels of that triangle.
+
+The existing triangle rasterization and Z-buffer logic remain unchanged.
+
+Specular lighting is not implemented in this part.
+
+### Verification
+
+I enabled `Filled Triangles` and disabled `Show Z-Buffer` and `Draw Normals`.
+
+I used the following World Rotation settings:
+
+- World Rotation X = `20.0`
+- World Rotation Y = `30.0`
+- World Rotation Z = `0.0`
+
+The initial lighting settings were:
+
+- Light Position = `(2.0, 2.0, 7.0)`
+- Ambient RGB = `(0.1, 0.1, 0.1)`
+- Diffuse RGB = `(1.0, 1.0, 1.0)`
+
+The rendered model showed different brightness levels across its triangles, while each individual triangle maintained a uniform color.
+
+To verify that the lighting responds to the light position, I changed Light Position X from `2.0` to `-7.0`, keeping the other settings unchanged.
+
+The brightness distribution changed: the left side became brighter, while the right side became significantly darker.
+
+I also tested the Ambient and Diffuse components separately.
+
+First, I set Diffuse RGB to `(0.0, 0.0, 0.0)` while keeping Ambient RGB at `(0.1, 0.1, 0.1)`.
+
+The model returned to a uniform dark color, confirming that the directional Diffuse contribution was disabled.
+
+Next, I set Ambient RGB to `(0.0, 0.0, 0.0)` and Diffuse RGB to `(1.0, 1.0, 1.0)`.
+
+The model displayed directional lighting without the Ambient contribution. The illuminated triangles remained visible, while the triangles receiving little or no Diffuse lighting appeared dark.
+
+For the final screenshot, I used:
+
+- Light Position = `(-7.0, 2.0, 7.0)`
+- World Rotation = `(20.0, 30.0, 0.0)`
+- Ambient RGB = `(0.1, 0.1, 0.1)`
+- Diffuse RGB = `(1.0, 1.0, 1.0)`
+
+![Flat shading with ambient and diffuse lighting](./assets/HW5_image2.png)
+
+### Result
+
+Flat Shading with Ambient and Diffuse lighting was successfully implemented.
+
+Each triangle receives a single color calculated from its face normal, center position, light direction, and material properties.
+
+The rendered model now responds to changes in the point light position, producing a faceted appearance with different brightness levels across the triangles.
+
+The existing rasterization and depth-buffer functionality were preserved.
+
+---

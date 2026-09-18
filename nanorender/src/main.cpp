@@ -679,17 +679,69 @@ for (size_t face_index = 0; face_index < mesh.faces.size(); face_index++)
 
 if (show_filled_triangles || show_z_buffer)
 {
+// HW5 Part 2 - Face normal in world space.
+glm::vec3 world_edge1 =
+    glm::vec3(local_v1) - glm::vec3(local_v0);
+
+glm::vec3 world_edge2 =
+    glm::vec3(local_v2) - glm::vec3(local_v0);
+
+glm::vec3 face_normal_world =
+    glm::cross(world_edge2, world_edge1);
+
+float normal_world_length = glm::length(face_normal_world);
+
+if (normal_world_length > 0.000001f)
+{
+    face_normal_world /= normal_world_length;
+}
+else
+{
+    face_normal_world = glm::vec3(0.0f);
+}
+// HW5 Part 2 - Triangle center in world space.
+glm::vec3 triangle_center_world =
+    (glm::vec3(local_v0) +
+     glm::vec3(local_v1) +
+     glm::vec3(local_v2)) / 3.0f;
+// HW5 Part 2 - Light direction in world space.
+glm::vec3 light_direction =
+    point_light.position - triangle_center_world;
+
+float light_distance = glm::length(light_direction);
+
+if (light_distance > 0.000001f)
+{
+    light_direction /= light_distance;
+}
+else
+{
+    light_direction = glm::vec3(0.0f);
+}
+// HW5 Part 2 - Lambert diffuse factor.
+float diffuse_factor =
+    glm::max(glm::dot(face_normal_world, light_direction), 0.0f);
+// HW5 Part 2 - Compute diffuse lighting.
+glm::vec3 diffuse_color =
+    point_light.diffuse *
+    material.diffuse *
+    diffuse_factor;
 // HW5 Part 1 - Ambient lighting
 glm::vec3 ambient_color =
     point_light.ambient * material.ambient;
 
-ambient_color =
-    glm::clamp(ambient_color, glm::vec3(0.0f), glm::vec3(1.0f));
+// HW5 Part 2 - Combine ambient and diffuse lighting.
+glm::vec3 final_color =
+    ambient_color + diffuse_color;
+
+// Clamp the final color to the valid RGB range.
+final_color =
+    glm::clamp(final_color, glm::vec3(0.0f), glm::vec3(1.0f));
 
 uint32_t face_color = MFB_RGB(
-    (int)(ambient_color.r * 255.0f),
-    (int)(ambient_color.g * 255.0f),
-    (int)(ambient_color.b * 255.0f));
+    (int)(final_color.r * 255.0f),
+    (int)(final_color.g * 255.0f),
+    (int)(final_color.b * 255.0f));
 
     for (int y = min_y; y <= max_y; y++)
     {
