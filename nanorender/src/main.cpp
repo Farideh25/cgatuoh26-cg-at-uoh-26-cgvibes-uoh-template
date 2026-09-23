@@ -99,6 +99,7 @@ struct Material
     glm::vec3 ambient;
     glm::vec3 diffuse;
     glm::vec3 specular;
+    float shininess;
 };
 // HW4 Part 2 - Compute barycentric coordinates in screen space.
 glm::vec3 compute_barycentric(
@@ -132,7 +133,15 @@ glm::vec3 compute_barycentric(
 
     return glm::vec3(alpha, beta, gamma);
 }
-
+// HW5 Part 3 - Compute the reflection of an incident light vector.
+glm::vec3 compute_reflection_vector(
+    const glm::vec3 &incident_direction,
+    const glm::vec3 &surface_normal)
+{
+    return incident_direction -
+           2.0f * glm::dot(incident_direction, surface_normal) *
+           surface_normal;
+}
 bool load_obj(const char *filename, Mesh &mesh)
 {
     std::ifstream file(filename);
@@ -396,7 +405,8 @@ static PointLight point_light{
 static Material material{
   glm::vec3(0.7f, 0.2f, 0.2f),
   glm::vec3(0.7f, 0.2f, 0.2f),
-  glm::vec3(1.0f, 1.0f, 1.0f)
+  glm::vec3(1.0f, 1.0f, 1.0f),
+  32.0f
 };
   // HW3 Part 3 - Perspective Projection parameters
   static int use_perspective = 0;
@@ -408,6 +418,7 @@ static Material material{
   static int show_local_axes = 0;
   static int show_bounding_box = 0;
   static int show_normals = 0;
+  static int show_specular_debug = 0;
   static int show_filled_triangles = 0;
   static int show_z_buffer = 0;
 
@@ -718,9 +729,42 @@ else
 {
     light_direction = glm::vec3(0.0f);
 }
+// HW5 Part 3 - Incoming light direction in world space.
+glm::vec3 incident_direction = -light_direction;
+// HW5 Part 3 - Reflected light direction in world space.
+glm::vec3 reflection_direction =
+    compute_reflection_vector(incident_direction, face_normal_world);
+// HW5 Part 3 - View direction in world space.
+glm::vec3 view_direction =
+    camera.position - triangle_center_world;
+
+float view_distance = glm::length(view_direction);
+
+if (view_distance > 0.000001f)
+{
+    view_direction /= view_distance;
+}
+else
+{
+    view_direction = glm::vec3(0.0f);
+}
 // HW5 Part 2 - Lambert diffuse factor.
 float diffuse_factor =
     glm::max(glm::dot(face_normal_world, light_direction), 0.0f);
+// HW5 Part 3 - Compute the specular factor.
+float specular_factor = 0.0f;
+
+if (diffuse_factor > 0.0f)
+{
+    specular_factor = glm::pow(
+        glm::max(glm::dot(reflection_direction, view_direction), 0.0f),
+        material.shininess);
+}
+// HW5 Part 3 - Compute specular lighting.
+glm::vec3 specular_color =
+    point_light.specular *
+    material.specular *
+    specular_factor;
 // HW5 Part 2 - Compute diffuse lighting.
 glm::vec3 diffuse_color =
     point_light.diffuse *
@@ -730,9 +774,9 @@ glm::vec3 diffuse_color =
 glm::vec3 ambient_color =
     point_light.ambient * material.ambient;
 
-// HW5 Part 2 - Combine ambient and diffuse lighting.
+// HW5 Part 3 - Combine ambient, diffuse, and specular lighting.
 glm::vec3 final_color =
-    ambient_color + diffuse_color;
+    ambient_color + diffuse_color + specular_color;
 
 // Clamp the final color to the valid RGB range.
 final_color =
@@ -775,6 +819,47 @@ uint32_t face_color = MFB_RGB(
                 }
             }
         }
+    }
+    if (show_specular_debug && face_index < 6)
+    {
+        const uint32_t light_vector_color = MFB_RGB(255, 255, 0);
+        const uint32_t reflection_vector_color = MFB_RGB(0, 255, 0);
+
+        glm::vec3 box_size = max_corner - min_corner;
+        float debug_vector_length =
+            glm::max(glm::max(box_size.x, box_size.y), box_size.z) * 0.25f;
+
+        if (debug_vector_length <= 0.0f)
+        {
+            debug_vector_length = 0.5f;
+        }
+
+        glm::vec3 light_end_world =
+            triangle_center_world + incident_direction * debug_vector_length;
+
+        glm::vec3 reflection_end_world =
+            triangle_center_world + reflection_direction * debug_vector_length;
+
+        glm::vec3 screen_center =
+            to_screen(triangle_center_world);
+
+        glm::vec3 screen_light_end =
+            to_screen(light_end_world);
+
+        glm::vec3 screen_reflection_end =
+            to_screen(reflection_end_world);
+
+        draw_line((int)screen_center.x,
+                  (int)screen_center.y,
+                  (int)screen_light_end.x,
+                  (int)screen_light_end.y,
+                  light_vector_color);
+
+        draw_line((int)screen_center.x,
+                  (int)screen_center.y,
+                  (int)screen_reflection_end.x,
+                  (int)screen_reflection_end.y,
+                  reflection_vector_color);
     }
 }
 else
@@ -1103,6 +1188,7 @@ if (show_z_buffer)
       mu_checkbox(ctx, "Show Local Axes", &show_local_axes);
       mu_checkbox(ctx, "Show Bounding Box", &show_bounding_box);
       mu_checkbox(ctx, "Draw Normals", &show_normals);
+      mu_checkbox(ctx, "Specular Debug", &show_specular_debug);
       mu_checkbox(ctx, "Filled Triangles", &show_filled_triangles);
       mu_checkbox(ctx, "Show Z-Buffer", &show_z_buffer);
 

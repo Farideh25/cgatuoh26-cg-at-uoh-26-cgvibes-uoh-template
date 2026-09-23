@@ -172,3 +172,108 @@ The rendered model now responds to changes in the point light position, producin
 The existing rasterization and depth-buffer functionality were preserved.
 
 ---
+## Part 3 - Specular Highlights
+
+### Implementation
+
+In this part, I extended the existing Ambient and Diffuse lighting model by adding a Specular lighting component.
+
+The lighting calculation remains Flat Shading: the lighting values are calculated once per triangle and the resulting color is used for all pixels of that triangle.
+
+I added a `shininess` property to the `Material` structure and initialized it to:
+
+`shininess = 32.0`
+
+To calculate the Specular component, I first computed the incoming light direction.
+
+The existing `light_direction` vector points from the triangle center toward the point light, so the incoming direction is the opposite vector:
+
+`incident_direction = -light_direction`
+
+I implemented a separate function to calculate the reflection vector using the surface normal:
+
+`R = I - 2 * dot(I, N) * N`
+
+where `I` is the incoming light direction and `N` is the normalized face normal.
+
+The View vector is calculated in World Space from the triangle center toward the camera:
+
+`view_direction = camera.position - triangle_center_world`
+
+The View vector is normalized before being used, with a check to avoid division by zero.
+
+The Specular factor is calculated by comparing the reflected light direction with the View direction:
+
+`specular_factor = pow(max(dot(reflection_direction, view_direction), 0.0), material.shininess)`
+
+The Specular calculation is only applied when the triangle also receives positive Diffuse lighting.
+
+The Specular color is calculated using the Specular properties of the point light and material:
+
+`specular_color = point_light.specular * material.specular * specular_factor`
+
+Finally, the three lighting components are combined:
+
+`final_color = ambient_color + diffuse_color + specular_color`
+
+The resulting RGB values are clamped to the range `0 ... 1` before conversion to the framebuffer RGB representation.
+
+To verify the reflection calculation, I added a `Specular Debug` option to the UI.
+
+When enabled, the renderer draws debug vectors from the centers of several faces:
+
+- Yellow lines represent the Incoming Light Vector.
+- Green lines represent the Reflection Vector.
+
+The vectors are calculated in World Space and then projected to screen coordinates using the existing `to_screen` function before being drawn with `draw_line`.
+
+### Verification
+
+I first verified the Specular calculation independently from the Ambient and Diffuse components.
+
+For the isolated Specular test, I used:
+
+- World Rotation = `(0.0, 0.0, 0.0)`
+- Camera Position = `(0.0, 0.0, 5.0)`
+- Light Position = `(0.0, 0.0, 5.0)`
+- Ambient RGB = `(0.0, 0.0, 0.0)`
+- Diffuse RGB = `(0.0, 0.0, 0.0)`
+- Specular RGB = `(1.0, 1.0, 1.0)`
+- Material Shininess = `32.0`
+
+With Ambient and Diffuse completely disabled, a front-facing triangle became strongly illuminated while the other triangles remained dark.
+
+This confirmed that the visible illumination was produced by the Specular component rather than by Ambient or Diffuse lighting.
+
+![Specular-only lighting verification](./assets/HW5_image4.png)
+
+I also verified the reflection-vector calculation using the new `Specular Debug` visualization.
+
+For the debug screenshot, I used:
+
+- World Rotation = `(20.0, 30.0, 0.0)`
+- Camera Position = `(0.0, 0.0, 5.0)`
+- Light Position = `(2.0, 2.0, 7.0)`
+- Ambient RGB = `(0.1, 0.1, 0.1)`
+- Diffuse RGB = `(1.0, 1.0, 1.0)`
+- Specular RGB = `(1.0, 1.0, 1.0)`
+- `Filled Triangles` enabled
+- `Specular Debug` enabled
+
+The yellow incoming-light vectors and green reflection vectors are visible from the centers of several faces and change direction according to the orientation of each face.
+
+![Incoming light and reflection debug vectors](./assets/HW5_image3.png)
+
+### Result
+
+Specular Highlights were successfully added to the existing Ambient and Diffuse lighting model.
+
+The renderer now calculates the incoming light direction, reflection direction, View vector, Shininess contribution, and Specular color for each triangle.
+
+The final triangle color is calculated from the sum of the Ambient, Diffuse, and Specular components while preserving the existing Flat Shading approach.
+
+The debug visualization also provides a direct visual verification of the incoming and reflected light directions.
+
+The existing rasterization and Z-buffer functionality remain unchanged.
+
+---
