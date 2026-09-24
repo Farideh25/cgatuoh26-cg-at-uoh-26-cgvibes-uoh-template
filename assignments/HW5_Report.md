@@ -277,3 +277,98 @@ The debug visualization also provides a direct visual verification of the incomi
 The existing rasterization and Z-buffer functionality remain unchanged.
 
 ---
+
+## Part 4 - Phong Shading
+
+### Implementation
+
+In this part, I replaced the previous Flat Shading lighting calculation with **Phong Shading (Per-Pixel Shading)**.
+
+Instead of calculating the lighting equation once per triangle using the face normal and triangle center, the renderer now calculates the lighting separately for **every pixel** inside each triangle.
+
+To support this, I first transformed the mesh vertex normals from model space to World Space.
+
+Because normals should not be transformed in the same way as positions when scaling is involved, I constructed a **normal matrix** from the model transformation:
+
+`normal_matrix = transpose(inverse(mat3(final_transform_matrix)))`
+
+Each vertex normal of the current triangle is transformed to World Space using this matrix and then normalized.
+
+During triangle rasterization, I reused the existing barycentric coordinates of each pixel:
+
+`alpha, beta, gamma`
+
+Using these barycentric weights, I interpolated the World Space position of the current pixel:
+
+`pixel_position_world = alpha * local_v0 + beta * local_v1 + gamma * local_v2`
+
+I also interpolated the World Space normal of the current pixel from the three transformed vertex normals:
+
+`pixel_normal_world = alpha * normal0_world + beta * normal1_world + gamma * normal2_world`
+
+The interpolated normal is then normalized before being used in the lighting equation.
+
+For each visible pixel, I calculated the full lighting model:
+
+- **Ambient**
+- **Diffuse**
+- **Specular**
+
+The Diffuse component is computed from the dot product between the interpolated pixel normal and the light direction from the pixel to the point light.
+
+The Specular component is computed per pixel as well.
+
+For that calculation:
+
+- The incoming light direction is the opposite of the pixel light direction.
+- The reflection vector is computed from the incoming light direction and the interpolated normal.
+- The view direction is calculated from the current pixel toward the camera position.
+
+The Specular factor is then calculated as:
+
+`pixel_specular_factor = pow(max(dot(pixel_reflection_direction, pixel_view_direction), 0.0), material.shininess)`
+
+Finally, the three lighting components are combined:
+
+`pixel_final_color = ambient_color + pixel_diffuse_color + pixel_specular_color`
+
+The result is clamped to the valid RGB range `0 ... 1`, converted to framebuffer RGB values, and written to the pixel only if it passes the existing Z-buffer depth test.
+
+The previous Flat Shading color calculation per triangle was removed, while the existing debug vectors for the Specular Debug visualization were preserved.
+
+### Verification
+
+To verify the Phong Shading implementation, I used the following settings:
+
+- World Rotation = `(20.0, 30.0, 0.0)`
+- Camera Position = `(0.0, 0.0, 5.0)`
+- Light Position = `(2.0, 2.0, 7.0)`
+- Ambient RGB = `(0.1, 0.1, 0.1)`
+- Diffuse RGB = `(1.0, 1.0, 1.0)`
+- Specular RGB = `(1.0, 1.0, 1.0)`
+- Material Shininess = `32.0`
+- `Filled Triangles` enabled
+- `Show Z-Buffer` disabled
+- `Draw Normals` disabled
+
+With these settings, the model no longer appears faceted like in Flat Shading.
+
+Instead, the lighting changes smoothly across the surface of the object.
+
+A smooth Diffuse gradient is visible across the face, and the Specular highlight appears as a small bright region that changes continuously across the surface rather than affecting the entire triangle equally.
+
+This confirms that the lighting is now being calculated per pixel using interpolated positions and interpolated normals.
+
+![Phong shading with per-pixel ambient, diffuse, and specular lighting](./assets/HW5_image5.png)
+
+### Result
+
+Phong Shading was successfully implemented.
+
+The renderer now computes the lighting equation per pixel by interpolating the World Space position and the World Space normal of each rasterized pixel.
+
+This produces much smoother and more realistic lighting than the previous Flat Shading implementation.
+
+The Ambient, Diffuse, and Specular components are all preserved, the Specular highlight is now smoother and more localized, and the existing rasterization and Z-buffer pipeline continue to function correctly.
+
+---

@@ -581,6 +581,31 @@ glm::mat4 final_transform_matrix =
     world_rotation_matrix *
     world_scale_matrix *
     local_transform_matrix;
+// HW5 Part 4 - Normal matrix for transforming normals to world space.
+glm::mat3 normal_matrix =
+    glm::transpose(
+        glm::inverse(glm::mat3(final_transform_matrix)));
+
+auto transform_normal_to_world =
+    [&](const glm::vec3 &normal)
+{
+    glm::vec3 transformed_normal =
+        normal_matrix * normal;
+
+    float normal_length =
+        glm::length(transformed_normal);
+
+    if (normal_length > 0.000001f)
+    {
+        transformed_normal /= normal_length;
+    }
+    else
+    {
+        transformed_normal = glm::vec3(0.0f);
+    }
+
+    return transformed_normal;
+};
 
 glm::mat4 camera_translation_matrix =
     glm::translate(glm::mat4(1.0f), camera.position);
@@ -660,7 +685,15 @@ for (size_t face_index = 0; face_index < mesh.faces.size(); face_index++)
 
     glm::vec4 local_v2 =
         final_transform_matrix * glm::vec4(mesh.vertices[face.z], 1.0f);
+// HW5 Part 4 - Vertex normals transformed to world space.
+glm::vec3 normal0_world =
+    transform_normal_to_world(mesh.vertex_normals[face.x]);
 
+glm::vec3 normal1_world =
+    transform_normal_to_world(mesh.vertex_normals[face.y]);
+
+glm::vec3 normal2_world =
+    transform_normal_to_world(mesh.vertex_normals[face.z]);
     glm::vec3 v0 =
         to_screen(glm::vec3(local_v0));
 
@@ -734,58 +767,9 @@ glm::vec3 incident_direction = -light_direction;
 // HW5 Part 3 - Reflected light direction in world space.
 glm::vec3 reflection_direction =
     compute_reflection_vector(incident_direction, face_normal_world);
-// HW5 Part 3 - View direction in world space.
-glm::vec3 view_direction =
-    camera.position - triangle_center_world;
-
-float view_distance = glm::length(view_direction);
-
-if (view_distance > 0.000001f)
-{
-    view_direction /= view_distance;
-}
-else
-{
-    view_direction = glm::vec3(0.0f);
-}
-// HW5 Part 2 - Lambert diffuse factor.
-float diffuse_factor =
-    glm::max(glm::dot(face_normal_world, light_direction), 0.0f);
-// HW5 Part 3 - Compute the specular factor.
-float specular_factor = 0.0f;
-
-if (diffuse_factor > 0.0f)
-{
-    specular_factor = glm::pow(
-        glm::max(glm::dot(reflection_direction, view_direction), 0.0f),
-        material.shininess);
-}
-// HW5 Part 3 - Compute specular lighting.
-glm::vec3 specular_color =
-    point_light.specular *
-    material.specular *
-    specular_factor;
-// HW5 Part 2 - Compute diffuse lighting.
-glm::vec3 diffuse_color =
-    point_light.diffuse *
-    material.diffuse *
-    diffuse_factor;
-// HW5 Part 1 - Ambient lighting
+// HW5 Part 1 - Ambient lighting.
 glm::vec3 ambient_color =
     point_light.ambient * material.ambient;
-
-// HW5 Part 3 - Combine ambient, diffuse, and specular lighting.
-glm::vec3 final_color =
-    ambient_color + diffuse_color + specular_color;
-
-// Clamp the final color to the valid RGB range.
-final_color =
-    glm::clamp(final_color, glm::vec3(0.0f), glm::vec3(1.0f));
-
-uint32_t face_color = MFB_RGB(
-    (int)(final_color.r * 255.0f),
-    (int)(final_color.g * 255.0f),
-    (int)(final_color.b * 255.0f));
 
     for (int y = min_y; y <= max_y; y++)
     {
@@ -806,7 +790,30 @@ uint32_t face_color = MFB_RGB(
                     alpha * v0.z +
                     beta * v1.z +
                     gamma * v2.z;
+// HW5 Part 4 - Interpolate the world-space position of the pixel.
+glm::vec3 pixel_position_world =
+    alpha * glm::vec3(local_v0) +
+    beta * glm::vec3(local_v1) +
+    gamma * glm::vec3(local_v2);
 
+// HW5 Part 4 - Interpolate the world-space normal of the pixel.
+glm::vec3 pixel_normal_world =
+    alpha * normal0_world +
+    beta * normal1_world +
+    gamma * normal2_world;
+
+// Normalize the interpolated normal.
+float pixel_normal_length =
+    glm::length(pixel_normal_world);
+
+if (pixel_normal_length > 0.000001f)
+{
+    pixel_normal_world /= pixel_normal_length;
+}
+else
+{
+    pixel_normal_world = glm::vec3(0.0f);
+}
                 float depth =
                     use_perspective ? interpolated_z : -interpolated_z;
 
@@ -815,7 +822,97 @@ uint32_t face_color = MFB_RGB(
                 if (depth < g_z_buffer[pixel_index])
                 {
                     g_z_buffer[pixel_index] = depth;
-                    put_pixel(x, y, face_color);
+                    // HW5 Part 4 - Light direction from the current pixel to the light.
+glm::vec3 pixel_light_direction =
+    point_light.position - pixel_position_world;
+
+float pixel_light_distance =
+    glm::length(pixel_light_direction);
+
+if (pixel_light_distance > 0.000001f)
+{
+    pixel_light_direction /= pixel_light_distance;
+}
+else
+{
+    pixel_light_direction = glm::vec3(0.0f);
+}
+
+// HW5 Part 4 - Diffuse lighting per pixel.
+float pixel_diffuse_factor =
+    glm::max(
+        glm::dot(pixel_normal_world, pixel_light_direction),
+        0.0f);
+
+glm::vec3 pixel_diffuse_color =
+    point_light.diffuse *
+    material.diffuse *
+    pixel_diffuse_factor;
+
+// HW5 Part 4 - Incoming light direction at the current pixel.
+glm::vec3 pixel_incident_direction =
+    -pixel_light_direction;
+
+// HW5 Part 4 - Reflected light direction at the current pixel.
+glm::vec3 pixel_reflection_direction =
+    compute_reflection_vector(
+        pixel_incident_direction,
+        pixel_normal_world);
+
+// HW5 Part 4 - View direction from the current pixel to the camera.
+glm::vec3 pixel_view_direction =
+    camera.position - pixel_position_world;
+
+float pixel_view_distance =
+    glm::length(pixel_view_direction);
+
+if (pixel_view_distance > 0.000001f)
+{
+    pixel_view_direction /= pixel_view_distance;
+}
+else
+{
+    pixel_view_direction = glm::vec3(0.0f);
+}
+
+// HW5 Part 4 - Specular lighting per pixel.
+float pixel_specular_factor = 0.0f;
+
+if (pixel_diffuse_factor > 0.0f)
+{
+    pixel_specular_factor =
+        glm::pow(
+            glm::max(
+                glm::dot(
+                    pixel_reflection_direction,
+                    pixel_view_direction),
+                0.0f),
+            material.shininess);
+}
+
+glm::vec3 pixel_specular_color =
+    point_light.specular *
+    material.specular *
+    pixel_specular_factor;
+
+// HW5 Part 4 - Full Phong lighting per pixel.
+glm::vec3 pixel_final_color =
+    ambient_color +
+    pixel_diffuse_color +
+    pixel_specular_color;
+
+pixel_final_color =
+    glm::clamp(
+        pixel_final_color,
+        glm::vec3(0.0f),
+        glm::vec3(1.0f));
+
+uint32_t pixel_color = MFB_RGB(
+    (int)(pixel_final_color.r * 255.0f),
+    (int)(pixel_final_color.g * 255.0f),
+    (int)(pixel_final_color.b * 255.0f));
+
+put_pixel(x, y, pixel_color);
                 }
             }
         }
