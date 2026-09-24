@@ -71,6 +71,7 @@ To keep the repository clean and the reports professional, follow these standard
 | **Homework 2** | [View Report](./assignments/HW2_Report.md) |
 | **Homework 3** | [View Report](./assignments/HW3_Report.md) |
 | **Homework 4** | [View Report](./assignments/HW4_Report.md) |
+| **Homework 5** | [View Report](./assignments/HW5_Report.md) |
 
 ---
 
